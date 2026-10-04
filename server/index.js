@@ -216,6 +216,7 @@ async function sendTwilioSMS({ toPhone, messageText }) {
 // =================================================================
 async function sendSendGridAdapter({ to, subject, message, recipientName, senderName, cardFilePath }) {
   const apiKey = process.env.SENDGRID_API_KEY;
+  console.log(apiKey);
   const fromEmail = process.env.SENDGRID_FROM_EMAIL || process.env.SENDGRID_FROM || process.env.SMTP_FROM || process.env.SMTP_USER;
 
   if (!apiKey || !fromEmail) {
