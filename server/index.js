@@ -112,35 +112,68 @@ async function sendTwilioWhatsApp({ toPhone, recipientName, senderName, relation
   const fromWhatsApp = fromNum.startsWith('whatsapp:') ? fromNum : `whatsapp:${fromNum}`;
   const toWhatsApp = `whatsapp:${formattedPhone}`;
 
-  const caption = `🎀 *October Breast Cancer Awareness Month*\n\nTo: ${recipientName}\nFrom: ${senderName} (${relationship || 'Supporter'})\n\n"${messageText}"\n\n🌸 *SGPGIMS Breast Health Program* - www.sgpgibreasthealth.org.in\nHelpline: 0522-2496200`;
-
   const auth = Buffer.from(`${process.env.TWILIO_ACCOUNT_SID}:${process.env.TWILIO_AUTH_TOKEN}`).toString('base64');
-  const params = new URLSearchParams();
-  params.append('From', fromWhatsApp);
-  params.append('To', toWhatsApp);
-  params.append('Body', caption);
 
-  // Attach card image URL so Twilio delivers the full image directly in WhatsApp
+  const baseCaption = `🎀 *October Breast Cancer Awareness Month*\n\nTo: ${recipientName}\nFrom: ${senderName} (${relationship || 'Supporter'})\n\n"${messageText}"\n\n🌸 *SGPGIMS Breast Health Program* - www.sgpgibreasthealth.org.in\nHelpline: 0522-2496200`;
+
+  // 1. First Attempt: Send with embedded MediaUrl (works on upgraded accounts or supported sandbox media)
   if (mediaUrl) {
-    params.append('MediaUrl', mediaUrl);
+    try {
+      const params = new URLSearchParams();
+      params.append('From', fromWhatsApp);
+      params.append('To', toWhatsApp);
+      params.append('Body', baseCaption);
+      params.append('MediaUrl', mediaUrl);
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          Authorization: `Basic ${auth}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: params.toString(),
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        return { success: true, sid: data.sid, mediaAttached: true, provider: 'twilio-whatsapp' };
+      }
+
+      console.warn('[Twilio WhatsApp] MediaUrl attempt returned error, falling back to text + card link:', data?.message);
+    } catch (err) {
+      console.warn('[Twilio WhatsApp] MediaUrl attempt error, falling back to text:', err.message);
+    }
   }
 
-  const response = await fetch(endpoint, {
+  // 2. Second Attempt (Safe Fallback for Trial Accounts): Send message with direct Card Link
+  const fallbackCaption = mediaUrl
+    ? `${baseCaption}\n\n🖼️ *View & Download Your Personalized Card:*\n${mediaUrl}`
+    : baseCaption;
+
+  const textParams = new URLSearchParams();
+  textParams.append('From', fromWhatsApp);
+  textParams.append('To', toWhatsApp);
+  textParams.append('Body', fallbackCaption);
+
+  const fallbackResponse = await fetch(endpoint, {
     method: 'POST',
     headers: {
       Authorization: `Basic ${auth}`,
       'Content-Type': 'application/x-www-form-urlencoded',
     },
-    body: params.toString(),
+    body: textParams.toString(),
   });
 
-  const data = await response.json();
-  if (!response.ok) {
-    console.error('[Twilio WhatsApp Error]:', data);
-    throw new Error(data.message || `Twilio WhatsApp dispatch failed (${data.code})`);
+  const fallbackData = await fallbackResponse.json();
+  if (!fallbackResponse.ok) {
+    console.error('[Twilio WhatsApp Fallback Error]:', fallbackData);
+    throw new Error(
+      fallbackData.message ||
+      'Failed to dispatch WhatsApp message. (If using Twilio Sandbox, make sure your phone sent the join code to +14155238886).'
+    );
   }
 
-  return { success: true, sid: data.sid, mediaAttached: !!mediaUrl, provider: 'twilio-whatsapp' };
+  return { success: true, sid: fallbackData.sid, mediaAttached: false, provider: 'twilio-whatsapp-text' };
 }
 
 async function sendTwilioSMS({ toPhone, messageText }) {
