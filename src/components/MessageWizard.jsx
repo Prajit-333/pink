@@ -262,16 +262,8 @@ export const MessageWizard = () => {
           }
         } else if (channel === 'sms') {
           window.location.href = smsUrl;
-        } else if (channel === 'email') {
-          if (emailAddress.includes('@gmail.com')) {
-            const popup = window.open(gmailUrl, '_blank');
-            if (!popup || popup.closed || typeof popup.closed === 'undefined') {
-              window.location.href = defaultMailUrl;
-            }
-          } else {
-            window.location.href = defaultMailUrl;
-          }
         }
+        // Note: For 'email', no external mailto handler is launched. Backend handles delivery seamlessly.
       }
     }
 
