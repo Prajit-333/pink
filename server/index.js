@@ -212,27 +212,127 @@ async function sendTwilioSMS({ toPhone, messageText }) {
 }
 
 // =================================================================
-// 2. EMAIL ADAPTER (Nodemailer / SMTP)
+// 2. EMAIL ADAPTER (Twilio SendGrid v3 REST API / SMTP Fallback)
 // =================================================================
+async function sendSendGridAdapter({ to, subject, message, recipientName, senderName, cardFilePath }) {
+  const apiKey = process.env.SENDGRID_API_KEY;
+  const fromEmail = process.env.SENDGRID_FROM_EMAIL || process.env.SENDGRID_FROM || process.env.SMTP_FROM || process.env.SMTP_USER;
+
+  if (!apiKey || !fromEmail) {
+    return null; // Fall through to SMTP or mock
+  }
+
+  const htmlContent = `
+    <div style="font-family: Arial, -apple-system, BlinkMacSystemFont, sans-serif; max-width: 620px; margin: 0 auto; padding: 24px; background: #FFF1F6; border-radius: 20px; border: 1px solid #FFC2D9;">
+      <div style="text-align: center; margin-bottom: 20px;">
+        <h2 style="color: #E0157A; margin: 0 0 6px 0; font-size: 22px;">Breast Cancer Awareness Month</h2>
+        <p style="color: #9D174D; font-size: 14px; margin: 0; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">
+          Early Detection | Timely Treatment | Brighter Tomorrows
+        </p>
+      </div>
+
+      <div style="background: #ffffff; padding: 20px; border-radius: 16px; border: 1px solid #FFE0EC; box-shadow: 0 4px 12px rgba(224, 21, 122, 0.08);">
+        <p style="font-size: 14px; color: #880E4F; font-weight: bold; margin-top: 0;">Dear ${recipientName || 'Friend'},</p>
+        <p style="color: #3B1A2B; font-size: 15px; line-height: 1.6; white-space: pre-line; margin: 12px 0;">${message}</p>
+        <p style="font-size: 14px; color: #BE185D; font-weight: bold; margin-bottom: 0;">With love and strength,<br/>${senderName || 'Someone who cares'}</p>
+      </div>
+
+      ${
+        cardFilePath && fs.existsSync(cardFilePath)
+          ? `<div style="text-align: center; margin-top: 20px;">
+               <p style="font-size: 12px; color: #880E4F; margin-bottom: 8px;">Your personalized card is attached below.</p>
+             </div>`
+          : ''
+      }
+
+      <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #F8BBD0; text-align: center; font-size: 11px; color: #AD1457; line-height: 1.5;">
+        <p style="margin: 0 0 4px 0; font-weight: bold;">Department of Endocrine & Breast Surgery</p>
+        <p style="margin: 0 0 4px 0;">Sanjay Gandhi Postgraduate Institute of Medical Sciences (SGPGIMS), Lucknow</p>
+        <p style="margin: 0;">Helpline: <strong>0522-2496200</strong> | <a href="https://www.sgpgibreasthealth.org.in" style="color: #E0157A; text-decoration: underline;">www.sgpgibreasthealth.org.in</a></p>
+      </div>
+    </div>
+  `;
+
+  // Attach card image if present
+  const attachments = [];
+  if (cardFilePath && fs.existsSync(cardFilePath)) {
+    const fileBuffer = fs.readFileSync(cardFilePath);
+    attachments.push({
+      content: fileBuffer.toString('base64'),
+      filename: `Pink-Hope-Card-${recipientName || 'Friend'}.png`,
+      type: 'image/png',
+      disposition: 'attachment',
+    });
+  }
+
+  // Extract clean email from "Name <email@domain.com>" if formatted
+  const cleanFromEmail = fromEmail.includes('<') ? fromEmail.match(/<([^>]+)>/)?.[1] || fromEmail : fromEmail;
+
+  const payload = {
+    personalizations: [
+      {
+        to: [{ email: to.trim() }],
+      },
+    ],
+    from: {
+      email: cleanFromEmail.trim(),
+      name: 'Pink Hope - Breast Cancer Awareness',
+    },
+    subject: subject || `🌸 A Message of Strength & Hope for ${recipientName || 'You'}`,
+    content: [
+      {
+        type: 'text/html',
+        value: htmlContent,
+      },
+    ],
+    ...(attachments.length > 0 ? { attachments } : {}),
+  };
+
+  const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey.trim()}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (response.status === 202 || response.ok) {
+    return { success: true, provider: 'twilio-sendgrid-v3' };
+  }
+
+  const errorData = await response.json().catch(() => ({}));
+  console.error('[SendGrid Error]:', errorData);
+  throw new Error(
+    errorData?.errors?.[0]?.message ||
+    `SendGrid error (${response.status}). Verify your SENDGRID_FROM_EMAIL in SendGrid Sender Authentication.`
+  );
+}
+
 async function sendEmailAdapter({ to, subject, message, recipientName, senderName, cardFilePath }) {
+  // 1. Prioritize Twilio SendGrid REST API (HTTPS, 100% immune to SMTP port blocks)
+  if (process.env.SENDGRID_API_KEY) {
+    const result = await sendSendGridAdapter({ to, subject, message, recipientName, senderName, cardFilePath });
+    if (result) return result;
+  }
+
+  // 2. Secondary: SMTP / Nodemailer fallback
   if (!process.env.SMTP_USER || (!process.env.SMTP_PASS && !process.env.SMTP_HOST)) {
-    console.log(`[Email] Mock Send to ${to} (Configure SMTP_USER & SMTP_PASS in Render):`, {
+    console.log(`[Email] Mock Send to ${to} (Add SENDGRID_API_KEY & SENDGRID_FROM_EMAIL in Render):`, {
       subject,
       recipientName,
       senderName,
       cardAttached: !!cardFilePath,
     });
-    return { success: true, mocked: true, provider: 'smtp-mock' };
+    return { success: true, mocked: true, provider: 'email-mock' };
   }
 
-  // Sanitize password (remove any copied spaces from Google App Passwords)
   const cleanPass = (process.env.SMTP_PASS || '').replace(/\s+/g, '');
   const isGmail = (process.env.SMTP_HOST || '').includes('gmail') || (process.env.SMTP_USER || '').includes('@gmail.com');
 
   let transportOptions;
 
   if (isGmail) {
-    // Cloud hosts like Render block port 587; Gmail's native service configuration connects via SSL port 465
     transportOptions = {
       service: 'gmail',
       auth: {
@@ -419,7 +519,8 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     service: 'Pink Hope Breast Cancer Awareness Backend',
-    twilioConfigured: Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN),
+    twilioWhatsAppConfigured: Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN),
+    sendGridEmailConfigured: Boolean(process.env.SENDGRID_API_KEY && (process.env.SENDGRID_FROM_EMAIL || process.env.SENDGRID_FROM)),
     smtpConfigured: Boolean(process.env.SMTP_HOST && process.env.SMTP_USER),
   });
 });
@@ -437,8 +538,8 @@ function startServer(port) {
   const server = app.listen(port, () => {
     console.log(`\n🌸 Pink Hope Server running at http://localhost:${port}`);
     console.log(`   Health Check: http://localhost:${port}/api/health`);
-    console.log(`   Twilio WhatsApp API: ${process.env.TWILIO_ACCOUNT_SID ? '✅ Configured' : 'ℹ️  Mock Mode (Add keys to Render Environment)'}`);
-    console.log(`   SMTP Email: ${process.env.SMTP_HOST ? '✅ Configured' : 'ℹ️  Mock Mode (Add keys to Render Environment)'}\n`);
+    console.log(`   Twilio WhatsApp API: ${process.env.TWILIO_ACCOUNT_SID ? '✅ Configured' : 'ℹ️  Mock Mode'}`);
+    console.log(`   Twilio SendGrid Email: ${process.env.SENDGRID_API_KEY ? '✅ Configured (HTTPS REST API)' : 'ℹ️  Mock Mode (Add SENDGRID_API_KEY & SENDGRID_FROM_EMAIL in Render)'}\n`);
   });
 
   server.on('error', (err) => {
