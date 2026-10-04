@@ -807,67 +807,50 @@ export const MessageWizard = () => {
               <RibbonSVG variant="icon" size={32} />
             </div>
 
-            <h3 className="font-serif text-2xl font-bold text-burgundy dark:text-pink-100 mb-2">
-              Your Message of Hope is on its Way!
+            <h3 className="font-serif text-2xl font-bold text-burgundy dark:text-pink-100 mb-5">
+              {channel === 'email' ? 'Email sent successfully' : 'Your Message of Hope is on its Way!'}
             </h3>
-            <p className="text-xs sm:text-sm text-ink/80 dark:text-pink-200/80 mb-5 leading-relaxed">
-              Your greeting card and personal dedication for <strong className="text-pink-700 dark:text-pink-300">{recipient}</strong> have been processed for delivery.
-            </p>
+            {channel !== 'email' && (
+              <>
+                <p className="text-xs sm:text-sm text-ink/80 dark:text-pink-200/80 mb-5 leading-relaxed">
+                  Your greeting card and personal dedication for <strong className="text-pink-700 dark:text-pink-300">{recipient}</strong> have been processed for delivery.
+                </p>
 
-            {/* Quick Actions */}
-            <div className="space-y-2.5 mb-6 text-left">
-              {generatedLinks.whatsapp && (
-                <a
-                  href={generatedLinks.whatsapp}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full py-3 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-between shadow-md transition-all hover:scale-[1.02]"
-                >
-                  <div className="flex items-center gap-2">
-                    <MessageCircle className="w-4 h-4" />
-                    <span>Open in WhatsApp (Direct Chat)</span>
-                  </div>
-                  <span className="text-[10px] bg-emerald-700/80 px-2 py-0.5 rounded-full">Launch ↗</span>
-                </a>
-              )}
+                {/* Quick Actions */}
+                <div className="space-y-2.5 mb-6 text-left">
+                  {generatedLinks.whatsapp && (
+                    <a
+                      href={generatedLinks.whatsapp}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full py-3 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-between shadow-md transition-all hover:scale-[1.02]"
+                    >
+                      <div className="flex items-center gap-2">
+                        <MessageCircle className="w-4 h-4" />
+                        <span>Open in WhatsApp (Direct Chat)</span>
+                      </div>
+                      <span className="text-[10px] bg-emerald-700/80 px-2 py-0.5 rounded-full">Launch ↗</span>
+                    </a>
+                  )}
 
-              {channel === 'email' && (
-                <div className="grid grid-cols-2 gap-2">
-                  <a
-                    href={generatedLinks.gmail}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="py-2.5 px-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold text-xs flex items-center justify-center gap-1.5 shadow"
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(generatedLinks.fullText);
+                      setCopiedMessageText(true);
+                      setTimeout(() => setCopiedMessageText(false), 2500);
+                    }}
+                    className="w-full py-2.5 px-4 rounded-xl bg-pink-50 dark:bg-pink-900/40 border border-pink-200 dark:border-pink-800 text-pink-800 dark:text-pink-200 font-semibold text-xs flex items-center justify-between hover:bg-pink-100 transition-colors"
                   >
-                    <Mail className="w-3.5 h-3.5" />
-                    <span>Open in Gmail</span>
-                  </a>
-                  <a
-                    href={generatedLinks.mailto}
-                    className="py-2.5 px-3 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-semibold text-xs flex items-center justify-center gap-1.5 shadow"
-                  >
-                    <Mail className="w-3.5 h-3.5" />
-                    <span>Default Mail App</span>
-                  </a>
+                    <div className="flex items-center gap-2">
+                      {copiedMessageText ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-pink-600" />}
+                      <span>{copiedMessageText ? 'Message Copied!' : 'Copy Formatted Message Text'}</span>
+                    </div>
+                    <span className="text-[10px] text-pink-500 font-normal">Copy</span>
+                  </button>
                 </div>
-              )}
-
-              <button
-                type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText(generatedLinks.fullText);
-                  setCopiedMessageText(true);
-                  setTimeout(() => setCopiedMessageText(false), 2500);
-                }}
-                className="w-full py-2.5 px-4 rounded-xl bg-pink-50 dark:bg-pink-900/40 border border-pink-200 dark:border-pink-800 text-pink-800 dark:text-pink-200 font-semibold text-xs flex items-center justify-between hover:bg-pink-100 transition-colors"
-              >
-                <div className="flex items-center gap-2">
-                  {copiedMessageText ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-pink-600" />}
-                  <span>{copiedMessageText ? 'Message Copied!' : 'Copy Formatted Message Text'}</span>
-                </div>
-                <span className="text-[10px] text-pink-500 font-normal">Copy</span>
-              </button>
-            </div>
+              </>
+            )}
 
             {/* Secondary Action */}
             <div className="space-y-2 pt-2 border-t border-pink-200 dark:border-pink-800">
@@ -881,17 +864,19 @@ export const MessageWizard = () => {
                 }}
                 className="w-full py-2.5 rounded-full bg-pink-600 text-white font-bold text-xs shadow-glow-pink hover:bg-pink-700 transition-colors"
               >
-                Send Another Message
+                {channel === 'email' ? 'Close' : 'Send Another Message'}
               </button>
 
-              <button
-                type="button"
-                onClick={handleCopyLink}
-                className="w-full py-2 rounded-full text-pink-700 dark:text-pink-300 font-semibold text-xs hover:bg-pink-100 flex items-center justify-center gap-1.5 transition-colors"
-              >
-                {copiedLink ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <Share2 className="w-4 h-4" />}
-                <span>{copiedLink ? 'Website Link Copied!' : 'Share Website Link'}</span>
-              </button>
+              {channel !== 'email' && (
+                <button
+                  type="button"
+                  onClick={handleCopyLink}
+                  className="w-full py-2 rounded-full text-pink-700 dark:text-pink-300 font-semibold text-xs hover:bg-pink-100 flex items-center justify-center gap-1.5 transition-colors"
+                >
+                  {copiedLink ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <Share2 className="w-4 h-4" />}
+                  <span>{copiedLink ? 'Website Link Copied!' : 'Share Website Link'}</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
