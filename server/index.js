@@ -18,18 +18,18 @@ const PORT = parseInt(process.env.PORT || '5001', 10);
 app.use(cors());
 app.use(express.json());
 
-// Temporary upload directory with auto-cleanup
+// Temporary upload directory for greeting card images
 const uploadDir = path.join(__dirname, 'temp_uploads');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// Multer storage configuration with 10MB limits
+// Multer storage configuration (supports card PNG images up to 10MB)
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadDir),
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, `${file.fieldname}-${uniqueSuffix}${path.extname(file.originalname || '.png')}`);
+    cb(null, `card-${uniqueSuffix}${path.extname(file.originalname || '.png') || '.png'}`);
   },
 });
 
@@ -59,7 +59,7 @@ const rateLimiter = (req, res, next) => {
 
   if (recentCalls.length >= 30) {
     return res.status(429).json({
-      error: 'Too many card messages sent from this IP. Please try again in a little while.',
+      error: 'Too many messages sent recently. Please try again in a few minutes.',
     });
   }
 
@@ -68,7 +68,7 @@ const rateLimiter = (req, res, next) => {
   next();
 };
 
-// Periodic cleanup of temp files older than 6 hours
+// Periodic cleanup of temp card images older than 6 hours
 setInterval(() => {
   fs.readdir(uploadDir, (err, files) => {
     if (err) return;
@@ -84,151 +84,98 @@ setInterval(() => {
   });
 }, 60 * 60 * 1000);
 
-// Serve temporary uploaded media for public CDN / webhook access
+// Serve temporary card images publicly so Twilio can fetch & deliver them to WhatsApp
 app.use('/temp_uploads', express.static(uploadDir));
 
 // =================================================================
-// 1. META WHATSAPP CLOUD API ADAPTER (Official Meta Graph API)
+// 1. TWILIO WHATSAPP & SMS ADAPTER (Primary Messaging Provider)
 // =================================================================
-async function uploadMediaToMeta(filePath, mimeType = 'image/png') {
-  if (!process.env.META_WA_PHONE_NUMBER_ID || !process.env.META_WA_ACCESS_TOKEN) {
-    return null;
-  }
-
-  const fileBuffer = fs.readFileSync(filePath);
-  const blob = new Blob([fileBuffer], { type: mimeType });
-
-  const formData = new globalThis.FormData();
-  formData.append('messaging_product', 'whatsapp');
-  formData.append('file', blob, path.basename(filePath));
-  formData.append('type', mimeType);
-
-  const res = await fetch(
-    `https://graph.facebook.com/v20.0/${process.env.META_WA_PHONE_NUMBER_ID}/media`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${process.env.META_WA_ACCESS_TOKEN}`,
-      },
-      body: formData,
-    }
-  );
-
-  const data = await res.json();
-  if (!res.ok) {
-    console.error('[Meta WA API] Media Upload Error:', data);
-    throw new Error(data?.error?.message || 'Meta Media upload failed');
-  }
-  return data.id;
-}
-
-async function sendMetaWhatsAppAdapter({ toPhone, recipientName, senderName, messageText, cardFilePath, publicMediaUrl }) {
-  if (!process.env.META_WA_PHONE_NUMBER_ID || !process.env.META_WA_ACCESS_TOKEN) {
-    console.log(`[Meta WhatsApp] Mock Send to ${toPhone} (Configure META_WA_ACCESS_TOKEN & META_WA_PHONE_NUMBER_ID in .env):`, {
+async function sendTwilioWhatsApp({ toPhone, recipientName, senderName, relationship, messageText, mediaUrl }) {
+  if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
+    console.log(`[Twilio WhatsApp] Mock Mode (Add TWILIO_ACCOUNT_SID & TWILIO_AUTH_TOKEN in Render):`, {
+      toPhone,
       recipientName,
       senderName,
-      messageText,
-      cardAttached: !!cardFilePath,
+      mediaUrl,
     });
-    return { success: true, mocked: true, provider: 'meta-mock' };
+    return { success: true, mocked: true, provider: 'twilio-mock' };
   }
 
-  const cleanPhone = toPhone.replace(/[^0-9]/g, '');
-  const templateName = process.env.META_WA_TEMPLATE_NAME;
+  // Ensure number format is +<countryCode><number> (e.g. +919876543210)
+  let cleanDigits = toPhone.replace(/[^0-9]/g, '');
+  let formattedPhone = toPhone.startsWith('+') ? `+${cleanDigits}` : `+${cleanDigits}`;
 
-  let payload;
+  const endpoint = `https://api.twilio.com/2010-04-01/Accounts/${process.env.TWILIO_ACCOUNT_SID}/Messages.json`;
+  
+  // From number: Twilio Sandbox (+14155238886) or Twilio WhatsApp sender
+  const fromNum = process.env.TWILIO_WHATSAPP_NUMBER || process.env.TWILIO_WHATSAPP_FROM || '+14155238886';
+  const fromWhatsApp = fromNum.startsWith('whatsapp:') ? fromNum : `whatsapp:${fromNum}`;
+  const toWhatsApp = `whatsapp:${formattedPhone}`;
 
-  if (templateName) {
-    // A. Send via Approved WhatsApp Template (Required for initial outbound conversations)
-    let mediaId = null;
-    if (cardFilePath) {
-      mediaId = await uploadMediaToMeta(cardFilePath);
-    }
+  const caption = `🎀 *October Breast Cancer Awareness Month*\n\nTo: ${recipientName}\nFrom: ${senderName} (${relationship || 'Supporter'})\n\n"${messageText}"\n\n🌸 *SGPGIMS Breast Health Program* - www.sgpgibreasthealth.org.in\nHelpline: 0522-2496200`;
 
-    const headerParams = [];
-    if (mediaId) {
-      headerParams.push({
-        type: 'image',
-        image: { id: mediaId },
-      });
-    } else if (publicMediaUrl) {
-      headerParams.push({
-        type: 'image',
-        image: { link: publicMediaUrl },
-      });
-    }
+  const auth = Buffer.from(`${process.env.TWILIO_ACCOUNT_SID}:${process.env.TWILIO_AUTH_TOKEN}`).toString('base64');
+  const params = new URLSearchParams();
+  params.append('From', fromWhatsApp);
+  params.append('To', toWhatsApp);
+  params.append('Body', caption);
 
-    payload = {
-      messaging_product: 'whatsapp',
-      recipient_type: 'individual',
-      to: cleanPhone,
-      type: 'template',
-      template: {
-        name: templateName,
-        language: { code: 'en' },
-        components: [
-          ...(headerParams.length > 0 ? [{ type: 'header', parameters: headerParams }] : []),
-          {
-            type: 'body',
-            parameters: [
-              { type: 'text', text: recipientName || 'Friend' },
-              { type: 'text', text: senderName || 'Someone who cares' },
-              { type: 'text', text: messageText.substring(0, 1000) },
-            ],
-          },
-        ],
-      },
-    };
-  } else {
-    // B. Send standard Media Image message with text caption
-    let mediaId = null;
-    if (cardFilePath) {
-      mediaId = await uploadMediaToMeta(cardFilePath);
-    }
-
-    const caption = `🌸 *Breast Cancer Awareness Card*\n\nTo: ${recipientName}\nFrom: ${senderName}\n\n"${messageText}"\n\n🎀 *SGPGI Breast Health Program* - www.sgpgibreasthealth.org.in\nHelpline: 0522-2496200`;
-
-    if (mediaId) {
-      payload = {
-        messaging_product: 'whatsapp',
-        recipient_type: 'individual',
-        to: cleanPhone,
-        type: 'image',
-        image: {
-          id: mediaId,
-          caption: caption.substring(0, 1024),
-        },
-      };
-    } else {
-      payload = {
-        messaging_product: 'whatsapp',
-        recipient_type: 'individual',
-        to: cleanPhone,
-        type: 'text',
-        text: { body: caption },
-      };
-    }
+  // Attach card image URL so Twilio delivers the full image directly in WhatsApp
+  if (mediaUrl) {
+    params.append('MediaUrl', mediaUrl);
   }
 
-  const response = await fetch(
-    `https://graph.facebook.com/v20.0/${process.env.META_WA_PHONE_NUMBER_ID}/messages`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${process.env.META_WA_ACCESS_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    }
-  );
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      Authorization: `Basic ${auth}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: params.toString(),
+  });
 
-  const result = await response.json();
+  const data = await response.json();
   if (!response.ok) {
-    console.error('[Meta WA API] Message Send Error:', result);
-    throw new Error(result?.error?.message || 'Failed to dispatch WhatsApp message via Meta Cloud API');
+    console.error('[Twilio WhatsApp Error]:', data);
+    throw new Error(data.message || `Twilio WhatsApp dispatch failed (${data.code})`);
   }
 
-  return { success: true, provider: 'meta-cloud-api', messageId: result.messages?.[0]?.id };
+  return { success: true, sid: data.sid, mediaAttached: !!mediaUrl, provider: 'twilio-whatsapp' };
+}
+
+async function sendTwilioSMS({ toPhone, messageText }) {
+  if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN || !process.env.TWILIO_PHONE_NUMBER) {
+    console.log(`[Twilio SMS] Mock Send to ${toPhone}:`, messageText);
+    return { success: true, mocked: true, provider: 'twilio-sms-mock' };
+  }
+
+  let cleanDigits = toPhone.replace(/[^0-9]/g, '');
+  let formattedPhone = toPhone.startsWith('+') ? `+${cleanDigits}` : `+${cleanDigits}`;
+
+  const endpoint = `https://api.twilio.com/2010-04-01/Accounts/${process.env.TWILIO_ACCOUNT_SID}/Messages.json`;
+  const auth = Buffer.from(`${process.env.TWILIO_ACCOUNT_SID}:${process.env.TWILIO_AUTH_TOKEN}`).toString('base64');
+  
+  const params = new URLSearchParams();
+  params.append('From', process.env.TWILIO_PHONE_NUMBER);
+  params.append('To', formattedPhone);
+  params.append('Body', `October Breast Cancer Awareness: ${messageText} - SGPGI Helpline: 0522-2496200`);
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      Authorization: `Basic ${auth}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: params.toString(),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    console.error('[Twilio SMS Error]:', data);
+    throw new Error(data.message || 'Twilio SMS dispatch failed');
+  }
+
+  return { success: true, sid: data.sid, provider: 'twilio-sms' };
 }
 
 // =================================================================
@@ -236,7 +183,7 @@ async function sendMetaWhatsAppAdapter({ toPhone, recipientName, senderName, mes
 // =================================================================
 async function sendEmailAdapter({ to, subject, message, recipientName, senderName, cardFilePath }) {
   if (!process.env.SMTP_HOST || !process.env.SMTP_USER) {
-    console.log(`[Email] Mock Send to ${to} (Configure SMTP_HOST & SMTP_USER in .env):`, {
+    console.log(`[Email] Mock Send to ${to} (Configure SMTP_HOST & SMTP_USER in Render):`, {
       subject,
       recipientName,
       senderName,
@@ -307,42 +254,6 @@ async function sendEmailAdapter({ to, subject, message, recipientName, senderNam
 }
 
 // =================================================================
-// 3. TWILIO ADAPTER (SMS & WhatsApp Fallback)
-// =================================================================
-async function sendTwilioAdapter({ channel, phoneNumber, message, mediaUrl }) {
-  if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
-    console.log(`[Twilio] Mock ${channel.toUpperCase()} to ${phoneNumber} (Configure TWILIO_* in .env):`, message);
-    return { success: true, mocked: true, provider: 'twilio-mock' };
-  }
-
-  const endpoint = `https://api.twilio.com/2010-04-01/Accounts/${process.env.TWILIO_ACCOUNT_SID}/Messages.json`;
-  const fromNumber = channel === 'whatsapp' ? `whatsapp:${process.env.TWILIO_WHATSAPP_FROM}` : process.env.TWILIO_SMS_FROM;
-  const toNumber = channel === 'whatsapp' ? `whatsapp:${phoneNumber}` : phoneNumber;
-
-  const auth = Buffer.from(`${process.env.TWILIO_ACCOUNT_SID}:${process.env.TWILIO_AUTH_TOKEN}`).toString('base64');
-  const params = new URLSearchParams();
-  params.append('From', fromNumber);
-  params.append('To', toNumber);
-  params.append('Body', message);
-
-  if (mediaUrl) {
-    params.append('MediaUrl', mediaUrl);
-  }
-
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      Authorization: `Basic ${auth}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: params.toString(),
-  });
-
-  const data = await response.json();
-  return { success: response.ok, sid: data.sid, provider: 'twilio' };
-}
-
-// =================================================================
 // UNIFIED HANDLER FOR /api/send-card AND /api/send-message
 // =================================================================
 const handleSendRequest = async (req, res) => {
@@ -369,9 +280,11 @@ const handleSendRequest = async (req, res) => {
 
     if (cardFilePath) {
       const filename = path.basename(cardFilePath);
-      const host = req.get('host');
-      const protocol = req.protocol;
-      publicMediaUrl = `${protocol}://${host}/temp_uploads/${filename}`;
+      // Construct public URL for Twilio to download image
+      const host = req.get('x-forwarded-host') || req.get('host');
+      const protocol = req.get('x-forwarded-proto') || req.protocol;
+      const baseUrl = process.env.PUBLIC_APP_URL || `${protocol}://${host}`;
+      publicMediaUrl = `${baseUrl}/temp_uploads/${filename}`;
     }
 
     let dispatchResult;
@@ -381,35 +294,14 @@ const handleSendRequest = async (req, res) => {
         return res.status(400).json({ error: 'Phone number is required for WhatsApp.' });
       }
 
-      // 1. Prefer Meta WhatsApp Cloud API if configured
-      if (process.env.META_WA_ACCESS_TOKEN && process.env.META_WA_PHONE_NUMBER_ID) {
-        dispatchResult = await sendMetaWhatsAppAdapter({
-          toPhone: finalPhone,
-          recipientName: recipient,
-          senderName: sender,
-          messageText: finalMessage,
-          cardFilePath,
-          publicMediaUrl,
-        });
-      } else if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
-        // 2. Fallback to Twilio WhatsApp if configured
-        dispatchResult = await sendTwilioAdapter({
-          channel: 'whatsapp',
-          phoneNumber: finalPhone,
-          message: `🌸 *Breast Cancer Awareness Card*\nTo: ${recipient}\nFrom: ${sender} (${relationship})\n\n"${finalMessage}"\n\n🎀 SGPGI Breast Health Program`,
-          mediaUrl: publicMediaUrl,
-        });
-      } else {
-        // 3. Mock fallback for local testing & pre-deployment
-        dispatchResult = await sendMetaWhatsAppAdapter({
-          toPhone: finalPhone,
-          recipientName: recipient,
-          senderName: sender,
-          messageText: finalMessage,
-          cardFilePath,
-          publicMediaUrl,
-        });
-      }
+      dispatchResult = await sendTwilioWhatsApp({
+        toPhone: finalPhone,
+        recipientName: recipient,
+        senderName: sender,
+        relationship,
+        messageText: finalMessage,
+        mediaUrl: publicMediaUrl,
+      });
     } else if (channel === 'email') {
       if (!finalEmail) {
         return res.status(400).json({ error: 'Email address is required for Email.' });
@@ -428,11 +320,9 @@ const handleSendRequest = async (req, res) => {
         return res.status(400).json({ error: 'Phone number is required for SMS.' });
       }
 
-      dispatchResult = await sendTwilioAdapter({
-        channel: 'sms',
-        phoneNumber: finalPhone,
-        message: `October Breast Cancer Awareness: ${finalMessage} - SGPGI Breast Health Helpline: 0522-2496200`,
-        mediaUrl: null,
+      dispatchResult = await sendTwilioSMS({
+        toPhone: finalPhone,
+        messageText: finalMessage,
       });
     } else {
       return res.status(400).json({ error: `Unsupported channel: ${channel}` });
@@ -442,33 +332,32 @@ const handleSendRequest = async (req, res) => {
       success: true,
       channel,
       result: dispatchResult,
-      message: 'Card message processed successfully.',
+      message: 'Card message dispatched successfully.',
     });
   } catch (err) {
     console.error('[API Send Error]:', err);
     return res.status(500).json({
-      error: err.message || 'Failed to dispatch card message via backend server.',
+      error: err.message || 'Failed to dispatch card message via Twilio.',
     });
   }
 };
 
-// Route definitions (accepts both single and field-based uploads)
+// Route definitions
 const uploadMiddleware = upload.fields([
   { name: 'cardImage', maxCount: 1 },
   { name: 'voiceNote', maxCount: 1 },
 ]);
 
-app.post('/api/send-message', rateLimiter, uploadMiddleware, handleSendRequest);
 app.post('/api/send-card', rateLimiter, uploadMiddleware, handleSendRequest);
+app.post('/api/send-message', rateLimiter, uploadMiddleware, handleSendRequest);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     service: 'Pink Hope Breast Cancer Awareness Backend',
-    metaWhatsAppConfigured: Boolean(process.env.META_WA_ACCESS_TOKEN && process.env.META_WA_PHONE_NUMBER_ID),
-    smtpConfigured: Boolean(process.env.SMTP_HOST && process.env.SMTP_USER),
     twilioConfigured: Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN),
+    smtpConfigured: Boolean(process.env.SMTP_HOST && process.env.SMTP_USER),
   });
 });
 
@@ -485,8 +374,8 @@ function startServer(port) {
   const server = app.listen(port, () => {
     console.log(`\n🌸 Pink Hope Server running at http://localhost:${port}`);
     console.log(`   Health Check: http://localhost:${port}/api/health`);
-    console.log(`   Meta WhatsApp API: ${process.env.META_WA_ACCESS_TOKEN ? '✅ Configured' : 'ℹ️  Mock Mode (Add keys to .env)'}`);
-    console.log(`   SMTP Email: ${process.env.SMTP_HOST ? '✅ Configured' : 'ℹ️  Mock Mode (Add keys to .env)'}\n`);
+    console.log(`   Twilio WhatsApp API: ${process.env.TWILIO_ACCOUNT_SID ? '✅ Configured' : 'ℹ️  Mock Mode (Add keys to Render Environment)'}`);
+    console.log(`   SMTP Email: ${process.env.SMTP_HOST ? '✅ Configured' : 'ℹ️  Mock Mode (Add keys to Render Environment)'}\n`);
   });
 
   server.on('error', (err) => {
