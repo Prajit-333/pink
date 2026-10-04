@@ -212,20 +212,20 @@ async function sendTwilioSMS({ toPhone, messageText }) {
 }
 
 // =================================================================
-// 2. EMAIL ADAPTER (Twilio SendGrid v3 REST API / Mock Fallback)
+// 2. EMAIL ADAPTER (Resend REST API / Mock Fallback)
 // =================================================================
-async function sendSendGridAdapter({ to, subject, message, recipientName, senderName, cardFilePath }) {
-  const apiKey = (process.env.SENDGRID_API_KEY || '').trim();
-  const fromEmail = (process.env.SENDGRID_FROM_EMAIL || process.env.SENDGRID_FROM || '').trim();
+async function sendResendAdapter({ to, subject, message, recipientName, senderName, cardFilePath }) {
+  const apiKey = (process.env.RESEND_API_KEY || '').trim();
+  const fromEmail = (process.env.RESEND_FROM_EMAIL || process.env.RESEND_FROM || 'Pink Hope <onboarding@resend.dev>').trim();
 
   // If credentials are not configured or are sample placeholders, use mock mode gracefully
-  if (!apiKey || !fromEmail || apiKey.includes('SG.xxxx') || fromEmail.includes('your-verified')) {
-    console.log(`[Email] Mock Send to ${to} (Add SENDGRID_API_KEY & SENDGRID_FROM_EMAIL in Render):`, {
+  if (!apiKey || apiKey.includes('re_xxxx')) {
+    console.log(`[Email] Mock Send to ${to} (Add RESEND_API_KEY in Render/Environment):`, {
       recipientName,
       senderName,
       cardAttached: !!cardFilePath,
     });
-    return { success: true, mocked: true, provider: 'email-mock' };
+    return { success: true, mocked: true, provider: 'resend-mock' };
   }
 
   const htmlContent = `
@@ -266,36 +266,19 @@ async function sendSendGridAdapter({ to, subject, message, recipientName, sender
     attachments.push({
       content: fileBuffer.toString('base64'),
       filename: `Pink-Hope-Card-${recipientName || 'Friend'}.png`,
-      type: 'image/png',
-      disposition: 'attachment',
     });
   }
 
-  // Extract clean email from "Name <email@domain.com>" if formatted
-  const cleanFromEmail = fromEmail.includes('<') ? fromEmail.match(/<([^>]+)>/)?.[1] || fromEmail : fromEmail;
-
   const payload = {
-    personalizations: [
-      {
-        to: [{ email: to.trim() }],
-      },
-    ],
-    from: {
-      email: cleanFromEmail.trim(),
-      name: 'Pink Hope - Breast Cancer Awareness',
-    },
+    from: fromEmail,
+    to: [to.trim()],
     subject: subject || `🌸 A Message of Strength & Hope for ${recipientName || 'You'}`,
-    content: [
-      {
-        type: 'text/html',
-        value: htmlContent,
-      },
-    ],
+    html: htmlContent,
     ...(attachments.length > 0 ? { attachments } : {}),
   };
 
   try {
-    const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+    const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -304,27 +287,29 @@ async function sendSendGridAdapter({ to, subject, message, recipientName, sender
       body: JSON.stringify(payload),
     });
 
-    if (response.status === 202 || response.ok) {
-      return { success: true, provider: 'twilio-sendgrid-v3' };
+    const data = await response.json().catch(() => ({}));
+
+    if (response.ok) {
+      console.log('[Resend Success]: Email delivered to', to, 'ID:', data.id);
+      return { success: true, id: data.id, provider: 'resend' };
     }
 
-    const errorData = await response.json().catch(() => ({}));
-    console.error('[SendGrid Response Error]:', errorData);
+    console.error('[Resend Response Error]:', data);
     
-    // If SendGrid throws sender verification or key error, log clearly and return mock fallback
+    // If Resend throws sender/domain or verification error, log clearly and return fallback
     return {
       success: true,
-      provider: 'sendgrid-fallback',
-      warning: errorData?.errors?.[0]?.message || 'SendGrid dispatch note',
+      provider: 'resend-fallback',
+      warning: data?.message || 'Resend dispatch note',
     };
   } catch (err) {
-    console.error('[SendGrid Network Error]:', err.message);
-    return { success: true, provider: 'sendgrid-catch-fallback' };
+    console.error('[Resend Network Error]:', err.message);
+    return { success: true, provider: 'resend-catch-fallback' };
   }
 }
 
 async function sendEmailAdapter({ to, subject, message, recipientName, senderName, cardFilePath }) {
-  return await sendSendGridAdapter({ to, subject, message, recipientName, senderName, cardFilePath });
+  return await sendResendAdapter({ to, subject, message, recipientName, senderName, cardFilePath });
 }
 
 // =================================================================
@@ -431,7 +416,7 @@ app.get('/api/health', (req, res) => {
     status: 'ok',
     service: 'Pink Hope Breast Cancer Awareness Backend',
     twilioWhatsAppConfigured: Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN),
-    sendGridEmailConfigured: Boolean(process.env.SENDGRID_API_KEY && (process.env.SENDGRID_FROM_EMAIL || process.env.SENDGRID_FROM)),
+    resendEmailConfigured: Boolean(process.env.RESEND_API_KEY),
     smtpConfigured: Boolean(process.env.SMTP_HOST && process.env.SMTP_USER),
   });
 });
@@ -450,7 +435,7 @@ function startServer(port) {
     console.log(`\n🌸 Pink Hope Server running at http://localhost:${port}`);
     console.log(`   Health Check: http://localhost:${port}/api/health`);
     console.log(`   Twilio WhatsApp API: ${process.env.TWILIO_ACCOUNT_SID ? '✅ Configured' : 'ℹ️  Mock Mode'}`);
-    console.log(`   Twilio SendGrid Email: ${process.env.SENDGRID_API_KEY ? '✅ Configured (HTTPS REST API)' : 'ℹ️  Mock Mode (Add SENDGRID_API_KEY & SENDGRID_FROM_EMAIL in Render)'}\n`);
+    console.log(`   Resend Email API: ${process.env.RESEND_API_KEY ? '✅ Configured (HTTPS REST API)' : 'ℹ️  Mock Mode (Add RESEND_API_KEY in Render)'}\n`);
   });
 
   server.on('error', (err) => {
@@ -464,3 +449,4 @@ function startServer(port) {
 }
 
 startServer(PORT);
+
