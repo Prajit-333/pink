@@ -215,8 +215,8 @@ async function sendTwilioSMS({ toPhone, messageText }) {
 // 2. EMAIL ADAPTER (Nodemailer / SMTP)
 // =================================================================
 async function sendEmailAdapter({ to, subject, message, recipientName, senderName, cardFilePath }) {
-  if (!process.env.SMTP_HOST || !process.env.SMTP_USER) {
-    console.log(`[Email] Mock Send to ${to} (Configure SMTP_HOST & SMTP_USER in Render):`, {
+  if (!process.env.SMTP_USER || (!process.env.SMTP_PASS && !process.env.SMTP_HOST)) {
+    console.log(`[Email] Mock Send to ${to} (Configure SMTP_USER & SMTP_PASS in Render):`, {
       subject,
       recipientName,
       senderName,
@@ -225,15 +225,45 @@ async function sendEmailAdapter({ to, subject, message, recipientName, senderNam
     return { success: true, mocked: true, provider: 'smtp-mock' };
   }
 
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || '587', 10),
-    secure: process.env.SMTP_SECURE === 'true',
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  });
+  // Sanitize password (remove any copied spaces from Google App Passwords)
+  const cleanPass = (process.env.SMTP_PASS || '').replace(/\s+/g, '');
+  const isGmail = (process.env.SMTP_HOST || '').includes('gmail') || (process.env.SMTP_USER || '').includes('@gmail.com');
+
+  let transportOptions;
+
+  if (isGmail) {
+    // Cloud hosts like Render block port 587; Gmail's native service configuration connects via SSL port 465
+    transportOptions = {
+      service: 'gmail',
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: cleanPass,
+      },
+      tls: {
+        rejectUnauthorized: false,
+      },
+      connectionTimeout: 15000,
+      greetingTimeout: 10000,
+    };
+  } else {
+    const port = parseInt(process.env.SMTP_PORT || '465', 10);
+    transportOptions = {
+      host: process.env.SMTP_HOST,
+      port: port,
+      secure: port === 465 || process.env.SMTP_SECURE === 'true',
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: cleanPass,
+      },
+      tls: {
+        rejectUnauthorized: false,
+      },
+      connectionTimeout: 15000,
+      greetingTimeout: 10000,
+    };
+  }
+
+  const transporter = nodemailer.createTransport(transportOptions);
 
   const attachments = [];
   if (cardFilePath && fs.existsSync(cardFilePath)) {
