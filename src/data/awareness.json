@@ -1,0 +1,268 @@
+{
+  "intro": {
+    "title": "What is Breast Cancer?",
+    "subtitle": "A serious yet highly treatable disease when detected early",
+    "description": "Breast cancer is the most common cancer among women in India and worldwide. It occurs when cells in the breast begin to grow abnormally. With modern medical advances, timely detection, and comprehensive care, breast cancer has high cure rates. Early detection saves lives."
+  },
+  "symptoms": [
+    {
+      "id": "lump",
+      "title": "Lump or Thickening",
+      "short": "In breast or armpit",
+      "desc": "A new, painless (or sometimes tender) lump or firm thickening in the breast or armpit area.",
+      "icon": "Activity"
+    },
+    {
+      "id": "swelling",
+      "title": "Breast Swelling",
+      "short": "All or part of a breast",
+      "desc": "Unexplained swelling, change in size, shape, or symmetry of one or both breasts.",
+      "icon": "Maximize2"
+    },
+    {
+      "id": "dimpling",
+      "title": "Skin Dimpling",
+      "short": "Orange peel texture",
+      "desc": "Puckering, dimpling, or texture resembling an orange peel (peau d'orange) on the skin.",
+      "icon": "Layers"
+    },
+    {
+      "id": "irritation",
+      "title": "Skin Irritation & Redness",
+      "short": "Persistent redness or scaly skin",
+      "desc": "Redness, warmth, flakiness, or eczema-like scaling around the breast or areola.",
+      "icon": "AlertCircle"
+    },
+    {
+      "id": "pain",
+      "title": "Nipple or Breast Pain",
+      "short": "Persistent localized discomfort",
+      "desc": "Constant or unusual tenderness and aching in the breast or nipple area.",
+      "icon": "HeartCrack"
+    },
+    {
+      "id": "discharge",
+      "title": "Nipple Discharge",
+      "short": "Particularly bloody or clear fluid",
+      "desc": "Spontaneous liquid or bloody discharge from the nipple without squeezing.",
+      "icon": "Droplets"
+    },
+    {
+      "id": "inversion",
+      "title": "Nipple Inversion or Shape Change",
+      "short": "Turning inward or flattening",
+      "desc": "A nipple that newly turns inward, flattens, or changes its natural direction.",
+      "icon": "ArrowDownRight"
+    },
+    {
+      "id": "armpit-pain",
+      "title": "Armpit Discomfort",
+      "short": "Ache in the underarm",
+      "desc": "Persistent discomfort or dull ache in the axillary / underarm region.",
+      "icon": "ShieldAlert"
+    },
+    {
+      "id": "lymph-nodes",
+      "title": "Enlarged Lymph Nodes",
+      "short": "Small nodules in armpit or collarbone",
+      "desc": "Palpable, swollen lymph glands under the arm or above the collarbone.",
+      "icon": "CircleDot"
+    }
+  ],
+  "riskFactors": {
+    "lifestyle": [
+      { "title": "Tobacco & Alcohol Consumption", "desc": "Smoking and alcohol elevate estrogen levels and cellular damage." },
+      { "title": "Obesity & Inactive Lifestyle", "desc": "Excess body weight increases circulating estrogen, especially post-menopause." },
+      { "title": "Processed & Junk Food", "desc": "Diets deficient in antioxidants and high in ultra-processed fats." }
+    ],
+    "personal": [
+      { "title": "Family History of Breast/Ovarian Cancer", "desc": "First-degree relatives (mother, sister, daughter) with breast cancer history." },
+      { "title": "Late First Pregnancy / No Breastfeeding", "desc": "First childbirth after age 30 or absence of breastfeeding." },
+      { "title": "Early Menarche & Late Menopause", "desc": "Periods starting before age 12 or menopause occurring after age 55 (longer estrogen exposure)." }
+    ],
+    "hormonal": [
+      { "title": "Long-Term Hormone Replacement Therapy", "desc": "Use of combined estrogen-progestin therapy for more than 5 years." },
+      { "title": "Unmonitored Oral Contraceptive Pills", "desc": "Prolonged contraceptive pill usage without periodic medical assessment." }
+    ]
+  },
+  "prevention": [
+    { "icon": "CalendarCheck", "title": "Annual Mammography", "desc": "Recommended yearly for all women aged 40 and above." },
+    { "icon": "HeartPulse", "title": "Monthly Self-Examination", "desc": "A simple 5-minute monthly habit for all women aged 20 and above." },
+    { "icon": "Salad", "title": "Balanced Nutrition", "desc": "Diet rich in fresh fruits, vegetables, whole grains, and lean proteins." },
+    { "icon": "Footprints", "title": "30 Min Daily Activity", "desc": "Brisk walking, yoga, or cardio at least 5 days a week." },
+    { "icon": "Ban", "title": "No Tobacco & Zero Alcohol", "desc": "Significantly lowers overall cancer risk and promotes wellness." },
+    { "icon": "Baby", "title": "Breastfeed for 6+ Months", "desc": "Offers protective biological benefits for both mother and baby." }
+  ],
+  "selfExam": [
+    {
+      "step": 1,
+      "title": "In Front of the Mirror",
+      "icon": "Eye",
+      "instructions": [
+        "Undress from the waist up and stand straight with shoulders relaxed and arms resting by your sides.",
+        "Inspect both breasts for size, shape, symmetry, skin dimpling, or redness.",
+        "Raise both arms high above your head and look for changes in contour or nipple lifting."
+      ]
+    },
+    {
+      "step": 2,
+      "title": "With Your Hands (Standing)",
+      "icon": "Hand",
+      "instructions": [
+        "Place one hand behind your head. Use the finger pads of your opposite hand.",
+        "Use firm, gentle pressure in three patterns: circular spirals, up-and-down lines, and radial wedges.",
+        "Gently squeeze the nipple to check for any abnormal fluid or discharge, and check the armpit."
+      ]
+    },
+    {
+      "step": 3,
+      "title": "In the Shower",
+      "icon": "Droplet",
+      "instructions": [
+        "Lather your hands with soap or shower gel to make skin glide smoothly.",
+        "Raise one arm and use the soapy flat fingers of the other hand to feel for lumps or thickening.",
+        "Glide thoroughly from collarbone down to ribcage and across to the underarm."
+      ]
+    },
+    {
+      "step": 4,
+      "title": "Lying Down in Bed",
+      "icon": "Bed",
+      "instructions": [
+        "Lie on your back with a small pillow under your right shoulder and right arm behind your head.",
+        "Using your left hand's flat finger pads, move in small overlapping circles covering the whole breast.",
+        "Switch sides and repeat the same steps for the left breast with your right hand."
+      ]
+    }
+  ],
+  "treatments": [
+    {
+      "title": "Oncoplastic Surgery",
+      "desc": "Surgical removal of the tumor while preserving breast shape and aesthetic symmetry.",
+      "tag": "Surgical Care",
+      "icon": "Scissors"
+    },
+    {
+      "title": "Chemotherapy",
+      "desc": "Targeted medications that circulate to destroy rapidly dividing cancer cells throughout the body.",
+      "tag": "Medical Oncology",
+      "icon": "Pill"
+    },
+    {
+      "title": "Radiation Therapy",
+      "desc": "Precise high-energy X-rays aimed at destroying any remaining microscopic cancer cells.",
+      "tag": "Radiation Oncology",
+      "icon": "Zap"
+    },
+    {
+      "title": "Hormonal Therapy",
+      "desc": "Medications that block estrogen or lower hormone levels to prevent recurrence in hormone-receptor-positive cancers.",
+      "tag": "Targeted Endocrine Care",
+      "icon": "ShieldCheck"
+    },
+    {
+      "title": "Immunotherapy",
+      "desc": "Innovative therapies that stimulate the patient's own immune system to identify and attack cancer cells.",
+      "tag": "Advanced Therapeutics",
+      "icon": "Sparkle"
+    }
+  ],
+  "actionSteps": [
+    {
+      "step": 1,
+      "title": "Don't Panic",
+      "desc": "Up to 80-90% of breast lumps turn out to be completely benign (non-cancerous cysts or fibroadenomas)."
+    },
+    {
+      "step": 2,
+      "title": "Consult a Specialist Promptly",
+      "desc": "Visit a breast surgeon or healthcare provider for a thorough clinical examination without delay."
+    },
+    {
+      "step": 3,
+      "title": "Complete Recommended Tests",
+      "desc": "Get standard diagnostic imaging (Mammography, Ultrasound, or Biopsy) for accurate clarity."
+    }
+  ],
+  "myths": [
+    {
+      "myth": "Breast cancer only affects women with a family history.",
+      "fact": "Over 75-80% of women diagnosed with breast cancer have no known family history of the disease. Regular screening is essential for everyone."
+    },
+    {
+      "myth": "If a breast lump doesn't hurt, it is definitely not cancer.",
+      "fact": "Most cancerous breast lumps are completely painless in early stages. Any new lump must be evaluated by a doctor."
+    },
+    {
+      "myth": "Mammograms cause breast cancer to spread.",
+      "fact": "Mammograms use extremely low doses of radiation and are proven to detect cancer years before it can be felt by hand."
+    },
+    {
+      "myth": "Wearing underwire bras or using deodorants causes breast cancer.",
+      "fact": "Extensive scientific studies have confirmed there is no link between bras, antiperspirants, and breast cancer."
+    },
+    {
+      "myth": "Breast cancer is a death sentence.",
+      "fact": "When caught in early stages (Stage I/II), the 5-year survival rate exceeds 90-95% with contemporary treatment protocols."
+    },
+    {
+      "myth": "Only older women after menopause get breast cancer.",
+      "fact": "While risk increases with age, younger women can and do develop breast cancer. Awareness starts at age 20."
+    }
+  ],
+  "quiz": [
+    {
+      "question": "How often should women aged 20 and above perform a Breast Self-Examination (BSE)?",
+      "options": [
+        "Once every year",
+        "Once a month (5-7 days after period ends)",
+        "Only when feeling pain",
+        "Every single day"
+      ],
+      "correct": 1,
+      "explanation": "Monthly self-exams help you know what is normal for your body so any subtle change can be noticed promptly."
+    },
+    {
+      "question": "At what age should average-risk women begin annual screening mammography?",
+      "options": [
+        "Age 25",
+        "Age 30",
+        "Age 40 and above",
+        "Age 65"
+      ],
+      "correct": 2,
+      "explanation": "Annual mammograms starting at age 40 can identify abnormalities long before physical symptoms appear."
+    },
+    {
+      "question": "True or False: Most breast lumps discovered turn out to be benign (non-cancerous).",
+      "options": [
+        "True - Most are cysts or fibroadenomas",
+        "False - All lumps are malignant"
+      ],
+      "correct": 0,
+      "explanation": "Up to 80-90% of breast lumps are benign, but a prompt specialist consultation is always needed to be certain."
+    },
+    {
+      "question": "Which of the following is a healthy lifestyle step to lower breast cancer risk?",
+      "options": [
+        "At least 30 minutes of daily exercise",
+        "A diet rich in fruits and whole foods",
+        "Avoiding tobacco and alcohol",
+        "All of the above"
+      ],
+      "correct": 3,
+      "explanation": "A balanced lifestyle with regular exercise, wholesome diet, and avoiding toxins significantly reduces risk."
+    },
+    {
+      "question": "What is the best immediate action if you notice a persistent change in your breast?",
+      "options": [
+        "Wait a few months to see if it goes away",
+        "Consult a breast specialist or doctor right away",
+        "Search online remedies and ignore it",
+        "Stop all physical activities"
+      ],
+      "correct": 1,
+      "explanation": "Prompt professional evaluation ensures accurate diagnosis and timely care with the best clinical outcomes."
+    }
+  ]
+}

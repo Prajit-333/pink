@@ -1,0 +1,17 @@
+{
+  "name": "Breast Cancer Awareness Month | SGPGI Breast Health Program",
+  "short_name": "Pink Ribbon",
+  "description": "Empowering awareness, early detection, and messages of hope for Breast Cancer Awareness Month (October).",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFF1F6",
+  "theme_color": "#E0157A",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

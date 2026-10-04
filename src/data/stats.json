@@ -1,0 +1,25 @@
+{
+  "showCounters": true,
+  "stats": [
+    {
+      "value": "100+",
+      "label": "Awareness & Screening Camps",
+      "subtitle": "Community outreach in Uttar Pradesh & across India"
+    },
+    {
+      "value": "24/7",
+      "label": "Guidance & Patient Support",
+      "subtitle": "Compassionate multidisciplinary care"
+    },
+    {
+      "value": "90%+",
+      "label": "Early Stage Cure Potential",
+      "subtitle": "When detected at Stage 1 / early presentation"
+    },
+    {
+      "value": "1000s",
+      "label": "Lives Touched & Empowered",
+      "subtitle": "Empowering women & families through education"
+    }
+  ]
+}

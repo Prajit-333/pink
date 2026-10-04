@@ -1,0 +1,180 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --pink-50: #FFF1F6;
+  --pink-100: #FFE0EC;
+  --pink-200: #FFC2D9;
+  --pink-300: #FFA3C7;
+  --pink-400: #F472A8;
+  --pink-500: #EC4899;
+  --pink-600: #E0157A; /* Signature Ribbon Pink */
+  --pink-800: #9D174D;
+  --burgundy: #7A0B3F;
+  --ink: #3B1A2B;
+  --cream: #FFF8FB;
+}
+
+.dark {
+  --pink-50: #200813;
+  --pink-100: #350E20;
+  --pink-200: #571634;
+  --pink-300: #831843;
+  --pink-400: #BE185D;
+  --pink-500: #EC4899;
+  --pink-600: #FF3399;
+  --pink-800: #FF80BF;
+  --burgundy: #FFD1E6;
+  --ink: #FFF1F6;
+  --cream: #14050D;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Poppins', 'Montserrat', 'Noto Sans Devanagari', 'Noto Sans Kannada', 'Noto Sans Tamil', sans-serif;
+  background-color: var(--cream);
+  color: var(--ink);
+  transition: background-color 0.3s ease, color 0.3s ease;
+  top: 0px !important;
+  position: static !important;
+}
+
+/* Hide Google Translate top bar and popups */
+.goog-te-banner-frame,
+iframe.goog-te-banner-frame,
+.goog-te-banner-frame.skiptranslate {
+  display: none !important;
+  visibility: hidden !important;
+  height: 0 !important;
+}
+
+body > .skiptranslate {
+  display: none !important;
+}
+
+#goog-gt-tt,
+.goog-te-balloon-frame {
+  display: none !important;
+}
+
+.goog-text-highlight {
+  background: none !important;
+  box-shadow: none !important;
+}
+
+/* Glassmorphism Classes */
+.glass-card {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 15px 35px -5px rgba(224, 21, 122, 0.08);
+}
+
+.dark .glass-card {
+  background: rgba(35, 10, 22, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 64, 140, 0.2);
+  box-shadow: 0 15px 35px -5px rgba(0, 0, 0, 0.5);
+}
+
+.glass-nav {
+  background: rgba(255, 248, 251, 0.82);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 194, 217, 0.4);
+}
+
+.dark .glass-nav {
+  background: rgba(20, 5, 13, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 64, 140, 0.2);
+}
+
+/* Satin Ribbon Draw Animation */
+@keyframes drawStroke {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-draw-ribbon {
+  stroke-dasharray: 2000;
+  stroke-dashoffset: 2000;
+  animation: drawStroke 2.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* Cursor Trail Item */
+.cursor-petal {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  transform: translate(-50%, -50%);
+  animation: fadePetal 0.9s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+}
+
+@keyframes fadePetal {
+  0% {
+    opacity: 0.85;
+    transform: translate(-50%, -50%) scale(1) rotate(0deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 25px)) scale(0.3) rotate(45deg);
+  }
+}
+
+/* 3D Card Flip styles */
+.perspective-1000 {
+  perspective: 1000px;
+}
+.transform-style-3d {
+  transform-style: preserve-3d;
+}
+.backface-hidden {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.rotate-y-180 {
+  transform: rotateY(180deg);
+}
+
+/* Reduced Motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .animate-draw-ribbon {
+    stroke-dashoffset: 0 !important;
+  }
+  .cursor-petal {
+    display: none !important;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #FFF1F6;
+}
+.dark ::-webkit-scrollbar-track {
+  background: #200813;
+}
+::-webkit-scrollbar-thumb {
+  background: #F472A8;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #E0157A;
+}
