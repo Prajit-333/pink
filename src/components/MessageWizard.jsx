@@ -198,10 +198,12 @@ export const MessageWizard = () => {
       fullText: fullTextBody,
     });
 
-    // 1. Try Backend API first (Meta WhatsApp Cloud API / SMTP Mailer)
+    // 1. Try Backend API first (Twilio WhatsApp / SendGrid Email)
     let sentViaBackend = false;
     try {
-      const backendUrl = import.meta.env.VITE_API_URL || '/api';
+      const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+      const backendUrl = import.meta.env.VITE_API_URL || (isLocalhost ? 'http://localhost:5001/api' : '/api');
+
       const formData = new FormData();
       formData.append('channel', channel);
       formData.append('recipient', recipient);
@@ -226,9 +228,12 @@ export const MessageWizard = () => {
         const data = await response.json();
         console.log('[Pink Hope] Card dispatched via backend:', data);
         sentViaBackend = true;
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        console.warn('[Pink Hope] Backend dispatch response error:', errData);
       }
     } catch (err) {
-      console.warn('[Pink Hope] Backend not reachable, using client-side direct dispatch:', err);
+      console.warn('[Pink Hope] Backend connection error, proceeding with confirmation:', err);
     }
 
     // 2. Client-side direct transmission (Web Share API with image file on mobile, or direct app launch)
