@@ -195,11 +195,50 @@ export const MessageWizard = () => {
     }
     setCardImageForClipboard(cardFile);
 
-    // Clean Phone Number & Full Formatted Text
+    // Build the share text before choosing a delivery path.
+    const fullTextBody = `🎀 *October Breast Cancer Awareness Month*\n\nTo: ${recipient}\nFrom: ${sender} (${relationship})\n\n"${personalNote ? personalNote + '\n\n' : ''}${finalFormattedMessage}"\n\n🌸 *SGPGIMS Breast Health Program* - www.sgpgibreasthealth.org.in\nHelpline: 0522-2496200`;
+
+    if (channel === 'whatsapp') {
+      setGeneratedLinks((previous) => ({ ...previous, fullText: fullTextBody }));
+
+      if (!cardFile) {
+        setSendError('The card image could not be generated. Please try again.');
+        setIsSending(false);
+        return;
+      }
+
+      const canShareImage =
+        typeof navigator.share === 'function' &&
+        typeof navigator.canShare === 'function' &&
+        navigator.canShare({ files: [cardFile] });
+
+      if (!canShareImage) {
+        setSendError('WhatsApp image sharing is supported on a mobile browser. Open this page on Android Chrome or iPhone Safari.');
+        setIsSending(false);
+        return;
+      }
+
+      try {
+        await navigator.share({
+          title: `Breast Cancer Awareness Card for ${recipient}`,
+          text: fullTextBody,
+          files: [cardFile],
+        });
+        setIsSending(false);
+        setSuccessModalOpen(true);
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          console.error('WhatsApp image share failed:', err);
+          setSendError('WhatsApp sharing was blocked. Please try again from a mobile browser.');
+        }
+        setIsSending(false);
+      }
+      return;
+    }
+
+    // Clean phone number for SMS only.
     const rawNumber = `${countryCode}${phoneNumber}`.replace(/[^0-9]/g, '');
     const cleanPhone = rawNumber.startsWith('0') ? rawNumber.replace(/^0+/, '') : rawNumber;
-
-    const fullTextBody = `🎀 *October Breast Cancer Awareness Month*\n\nTo: ${recipient}\nFrom: ${sender} (${relationship})\n\n"${personalNote ? personalNote + '\n\n' : ''}${finalFormattedMessage}"\n\n🌸 *SGPGIMS Breast Health Program* - www.sgpgibreasthealth.org.in\nHelpline: 0522-2496200`;
     const encodedBody = encodeURIComponent(fullTextBody);
     const emailSubject = encodeURIComponent(`Breast Cancer Awareness & Hope Card for ${recipient}`);
 
@@ -227,7 +266,7 @@ export const MessageWizard = () => {
       fullText: fullTextBody,
     });
 
-    // 1. Try Backend API first (Twilio WhatsApp / SendGrid Email)
+    // Try the backend only for SMS and email.
     let sentViaBackend = false;
     try {
       const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
@@ -706,7 +745,7 @@ export const MessageWizard = () => {
                   </div>
 
                   {/* Channel Inputs */}
-                  {channel === 'whatsapp' || channel === 'sms' ? (
+                  {channel === 'sms' ? (
                     <div>
                       <label className="block text-xs font-bold text-pink-900 dark:text-pink-200 mb-1">
                         Recipient Mobile Number *
@@ -733,8 +772,12 @@ export const MessageWizard = () => {
                         />
                       </div>
                       <p className="text-[11px] text-pink-500 mt-1">
-                        Dispatches the greeting card and message directly to the recipient.
+                        Sends the message through your configured SMS provider.
                       </p>
+                    </div>
+                  ) : channel === 'whatsapp' ? (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-xs text-emerald-800">
+                      WhatsApp will open the phone's share sheet with the card image and message. Select a contact in WhatsApp; no phone number is needed here.
                     </div>
                   ) : (
                     <div>
@@ -798,7 +841,7 @@ export const MessageWizard = () => {
                       )}
                       <span>
                         {channel === 'whatsapp'
-                          ? 'Send Card via WhatsApp'
+                          ? 'Share Card via WhatsApp'
                           : channel === 'sms'
                           ? 'Send Card via SMS'
                           : 'Send Card via Email'}
