@@ -64,8 +64,12 @@ export const MessageWizard = () => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [successModalOpen, setSuccessModalOpen] = useState(false);
+  const [sendError, setSendError] = useState('');
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedMessageText, setCopiedMessageText] = useState(false);
+  const [copiedCardImage, setCopiedCardImage] = useState(false);
+  const [cardImageClipboardError, setCardImageClipboardError] = useState('');
+  const [cardImageForClipboard, setCardImageForClipboard] = useState(null);
   const [generatedLinks, setGeneratedLinks] = useState({
     whatsapp: '',
     gmail: '',
@@ -120,22 +124,95 @@ export const MessageWizard = () => {
     setShowEmojiPicker(false);
   };
 
-  // Export card to PNG canvas in memory
+  // Wait until every image inside the card has loaded (or failed).
+  const waitForImages = async (element) => {
+    const images = Array.from(element.querySelectorAll('img'));
+    await Promise.all(
+      images.map((img) => {
+        if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+        return new Promise((resolve) => {
+          const finish = () => {
+            img.removeEventListener('load', finish);
+            img.removeEventListener('error', finish);
+            resolve();
+          };
+          img.addEventListener('load', finish, { once: true });
+          img.addEventListener('error', finish, { once: true });
+        });
+      })
+    );
+  };
+
+  // Export card to PNG (fixed 1080x1350 canvas).
   const generateCardImageBlob = async () => {
     if (!cardRef.current) return null;
+
     try {
+      await document.fonts.ready;
+      await waitForImages(cardRef.current);
+
       const canvas = await html2canvas(cardRef.current, {
-        scale: 2,
+        width: 1080,
+        height: 1350,
+        windowWidth: 1080,
+        windowHeight: 1350,
+        x: 0,
+        y: 0,
+        scrollX: 0,
+        scrollY: 0,
+        scale: 1,
         useCORS: true,
-        allowTaint: true,
+        allowTaint: false,
         backgroundColor: '#FFF1F6',
+        logging: false,
+        // Move the off-screen export card into the clone's viewport.
+        onclone: (clonedDoc) => {
+          const element = clonedDoc.getElementById('greeting-card-export');
+          if (element && element.parentElement) {
+            element.parentElement.style.left = '0px';
+            element.parentElement.style.top = '0px';
+          }
+        },
       });
-      return new Promise((resolve) => {
-        canvas.toBlob((blob) => resolve(blob), 'image/png', 0.95);
+
+      return await new Promise((resolve, reject) => {
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error('Failed to create greeting card PNG.'));
+            }
+          },
+          'image/png'
+        );
       });
-    } catch (err) {
-      console.error('Canvas export error:', err);
+    } catch (error) {
+      console.error('Card image export failed:', error);
       return null;
+    }
+  };
+
+  const copyCardImageToClipboard = async () => {
+    setCardImageClipboardError('');
+    if (!cardImageForClipboard) {
+      setCardImageClipboardError('The card image is not available to copy.');
+      return;
+    }
+    if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
+      setCardImageClipboardError('Image clipboard is not supported in this browser. Download the card and attach it manually.');
+      return;
+    }
+
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({ [cardImageForClipboard.type || 'image/png']: cardImageForClipboard }),
+      ]);
+      setCopiedCardImage(true);
+      setTimeout(() => setCopiedCardImage(false), 3000);
+    } catch (err) {
+      console.error('Image clipboard copy failed:', err);
+      setCardImageClipboardError('The browser blocked image clipboard access. Download the card and attach it manually.');
     }
   };
 
@@ -158,6 +235,7 @@ export const MessageWizard = () => {
     }
 
     setIsSending(true);
+    setSendError('');
 
     // Generate Card PNG Blob in memory for transmission
     const cardBlob = await generateCardImageBlob();
@@ -165,12 +243,59 @@ export const MessageWizard = () => {
     if (cardBlob) {
       cardFile = new File([cardBlob], `Pink-Hope-Card-${recipient}.png`, { type: 'image/png' });
     }
+    setCardImageForClipboard(cardFile);
 
-    // Clean Phone Number & Full Formatted Text
+    // Build the share text before choosing a delivery path.
+    const fullTextBody = `🎀 *October Breast Cancer Awareness Month*\n\nTo: ${recipient}\nFrom: ${sender} (${relationship})\n\n"${personalNote ? personalNote + '\n\n' : ''}${finalFormattedMessage}"\n\n🌸 *SGPGIMS Breast Health Program* - www.sgpgibreasthealth.org.in\nHelpline: 0522-2496200`;
+
+    if (channel === 'whatsapp') {
+      setGeneratedLinks((previous) => ({ ...previous, fullText: fullTextBody }));
+
+      if (!cardFile) {
+        setSendError('The card image could not be generated. Please try again.');
+        setIsSending(false);
+        return;
+      }
+
+      const canShareImage =
+        typeof navigator.share === 'function' &&
+        typeof navigator.canShare === 'function' &&
+        navigator.canShare({ files: [cardFile] });
+
+      if (!canShareImage) {
+        setSendError('WhatsApp image sharing is supported on a mobile browser. Open this page on Android Chrome or iPhone Safari.');
+        setIsSending(false);
+        return;
+      }
+
+      try {
+        // Some WhatsApp Web share targets ignore ShareData.text when a file is attached.
+        // Copy the caption first so it can be pasted into the caption field on those clients.
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(fullTextBody);
+          setCopiedMessageText(true);
+          setTimeout(() => setCopiedMessageText(false), 3000);
+        }
+        await navigator.share({
+          title: `Breast Cancer Awareness Card for ${recipient}`,
+          text: fullTextBody,
+          files: [cardFile],
+        });
+        setIsSending(false);
+        setSuccessModalOpen(true);
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          console.error('WhatsApp image share failed:', err);
+          setSendError('WhatsApp sharing was blocked. Please try again from a mobile browser.');
+        }
+        setIsSending(false);
+      }
+      return;
+    }
+
+    // Clean phone number for SMS only.
     const rawNumber = `${countryCode}${phoneNumber}`.replace(/[^0-9]/g, '');
     const cleanPhone = rawNumber.startsWith('0') ? rawNumber.replace(/^0+/, '') : rawNumber;
-
-    const fullTextBody = `🎀 *October Breast Cancer Awareness Month*\n\nTo: ${recipient}\nFrom: ${sender} (${relationship})\n\n"${personalNote ? personalNote + '\n\n' : ''}${finalFormattedMessage}"\n\n🌸 *SGPGIMS Breast Health Program* - www.sgpgibreasthealth.org.in\nHelpline: 0522-2496200`;
     const encodedBody = encodeURIComponent(fullTextBody);
     const emailSubject = encodeURIComponent(`Breast Cancer Awareness & Hope Card for ${recipient}`);
 
@@ -198,7 +323,7 @@ export const MessageWizard = () => {
       fullText: fullTextBody,
     });
 
-    // 1. Try Backend API first (Twilio WhatsApp / SendGrid Email)
+    // Try the backend only for SMS and email.
     let sentViaBackend = false;
     try {
       const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
@@ -227,17 +352,26 @@ export const MessageWizard = () => {
       if (response.ok) {
         const data = await response.json();
         console.log('[Pink Hope] Card dispatched via backend:', data);
-        sentViaBackend = true;
+        sentViaBackend = channel === 'whatsapp' ? data.result?.mediaAttached === true : true;
+        if (channel === 'whatsapp' && !sentViaBackend) {
+          setSendError('Twilio did not attach the card image. Check the Render and Twilio logs, then try again.');
+        }
       } else {
         const errData = await response.json().catch(() => ({}));
         console.warn('[Pink Hope] Backend dispatch response error:', errData);
+        if (channel === 'whatsapp') {
+          setSendError(errData.error || 'Twilio WhatsApp delivery failed.');
+        }
       }
     } catch (err) {
       console.warn('[Pink Hope] Backend connection error, proceeding with confirmation:', err);
+      if (channel === 'whatsapp') {
+        setSendError('The Twilio backend could not be reached. WhatsApp was not opened.');
+      }
     }
 
     // 2. Client-side direct transmission (Web Share API with image file on mobile, or direct app launch)
-    if (!sentViaBackend) {
+    if (!sentViaBackend && channel !== 'whatsapp') {
       let sharedViaWebShare = false;
       const shareFiles = [];
       if (cardFile) shareFiles.push(cardFile);
@@ -273,6 +407,9 @@ export const MessageWizard = () => {
     }
 
     setIsSending(false);
+    if (channel === 'whatsapp' && !sentViaBackend) {
+      return;
+    }
     setSuccessModalOpen(true);
 
     // Confetti burst
@@ -665,7 +802,7 @@ export const MessageWizard = () => {
                   </div>
 
                   {/* Channel Inputs */}
-                  {channel === 'whatsapp' || channel === 'sms' ? (
+                  {channel === 'sms' ? (
                     <div>
                       <label className="block text-xs font-bold text-pink-900 dark:text-pink-200 mb-1">
                         Recipient Mobile Number *
@@ -692,8 +829,12 @@ export const MessageWizard = () => {
                         />
                       </div>
                       <p className="text-[11px] text-pink-500 mt-1">
-                        Dispatches the greeting card and message directly to the recipient.
+                        Sends the message through your configured SMS provider.
                       </p>
+                    </div>
+                  ) : channel === 'whatsapp' ? (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-xs text-emerald-800">
+                      WhatsApp will open the phone's share sheet with the card image and message. Select a contact in WhatsApp; no phone number is needed here.
                     </div>
                   ) : (
                     <div>
@@ -727,6 +868,12 @@ export const MessageWizard = () => {
                     </span>
                   </label>
 
+                  {sendError && (
+                    <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700" role="alert">
+                      {sendError}
+                    </p>
+                  )}
+
                   {/* Step 2 Actions */}
                   <div className="flex justify-between items-center pt-4 border-t border-pink-200 dark:border-pink-800">
                     <button
@@ -751,7 +898,7 @@ export const MessageWizard = () => {
                       )}
                       <span>
                         {channel === 'whatsapp'
-                          ? 'Send Card via WhatsApp'
+                          ? 'Share Card via WhatsApp'
                           : channel === 'sms'
                           ? 'Send Card via SMS'
                           : 'Send Card via Email'}
@@ -813,11 +960,39 @@ export const MessageWizard = () => {
             {channel !== 'email' && (
               <>
                 <p className="text-xs sm:text-sm text-ink/80 dark:text-pink-200/80 mb-5 leading-relaxed">
-                  Your greeting card and personal dedication for <strong className="text-pink-700 dark:text-pink-300">{recipient}</strong> have been processed for delivery.
+                  Your greeting card and personal dedication for <strong className="text-pink-700 dark:text-pink-300">{recipient}</strong> are ready to share.
+                  {copiedMessageText && (
+                    <span className="block mt-2 text-emerald-700 dark:text-emerald-300 font-semibold">
+                Caption copied. Paste it into WhatsApp if the caption field is empty.
+                    </span>
+                  )}
                 </p>
 
                 {/* Quick Actions */}
                 <div className="space-y-2.5 mb-6 text-left">
+                  {cardImageForClipboard && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={copyCardImageToClipboard}
+                        className="w-full py-3 px-4 rounded-2xl bg-pink-600 hover:bg-pink-700 text-white font-bold text-xs flex items-center justify-between shadow-md transition-all hover:scale-[1.02]"
+                      >
+                        <div className="flex items-center gap-2">
+                          {copiedCardImage ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                          <span>{copiedCardImage ? 'Card Image Copied' : 'Copy Card Image'}</span>
+                        </div>
+                        <span className="text-[10px] bg-pink-700/80 px-2 py-0.5 rounded-full">
+                          {copiedCardImage ? 'Paste in WhatsApp' : 'Copy'}
+                        </span>
+                      </button>
+                      {cardImageClipboardError && (
+                        <p className="text-[11px] text-red-600 dark:text-red-300 px-1" role="alert">
+                          {cardImageClipboardError}
+                        </p>
+                      )}
+                    </>
+                  )}
+
                   {generatedLinks.whatsapp && (
                     <a
                       href={generatedLinks.whatsapp}

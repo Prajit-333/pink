@@ -7,10 +7,11 @@ import path from 'path';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 
-dotenv.config();
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Always load the project-root .env, even when the process is started from server/
+dotenv.config({ path: path.join(__dirname, '../.env') });
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '5001', 10);
@@ -90,6 +91,36 @@ app.use('/temp_uploads', express.static(uploadDir));
 // =================================================================
 // 1. TWILIO WHATSAPP & SMS ADAPTER (Primary Messaging Provider)
 // =================================================================
+function toE164Phone(value) {
+  const digits = String(value || '').replace(/[^\d]/g, '');
+  return digits ? `+${digits}` : '';
+}
+
+function isOutsideSessionWindow(twilioPayload) {
+  const code = Number(twilioPayload?.code);
+  const message = String(twilioPayload?.message || '').toLowerCase();
+  return (
+    code === 63016 ||
+    code === 63024 ||
+    message.includes('outside the allowed window') ||
+    message.includes('24-hour')
+  );
+}
+
+function sessionWindowError(toWhatsApp) {
+  return `WhatsApp did not send to ${toWhatsApp}. The recipient must message your business WhatsApp number first, and you must reply within 24 hours. Template sends are disabled until TWILIO_USE_TEMPLATE=true.`;
+}
+
+function mediaPathForTemplate(mediaUrl) {
+  if (!mediaUrl) return '';
+  try {
+    const parsed = new URL(mediaUrl);
+    return parsed.pathname.replace(/^\//, '');
+  } catch {
+    return String(mediaUrl).replace(/^https?:\/\/[^/]+\//, '');
+  }
+}
+
 async function sendTwilioWhatsApp({ toPhone, recipientName, senderName, relationship, messageText, mediaUrl }) {
   if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
     console.log(`[Twilio WhatsApp] Mock Mode (Add TWILIO_ACCOUNT_SID & TWILIO_AUTH_TOKEN in Render):`, {
@@ -101,22 +132,77 @@ async function sendTwilioWhatsApp({ toPhone, recipientName, senderName, relation
     return { success: true, mocked: true, provider: 'twilio-mock' };
   }
 
-  // Ensure number format is +<countryCode><number> (e.g. +919876543210)
-  let cleanDigits = toPhone.replace(/[^0-9]/g, '');
-  let formattedPhone = toPhone.startsWith('+') ? `+${cleanDigits}` : `+${cleanDigits}`;
-
+  const formattedPhone = toE164Phone(toPhone);
   const endpoint = `https://api.twilio.com/2010-04-01/Accounts/${process.env.TWILIO_ACCOUNT_SID}/Messages.json`;
-  
-  // From number: Twilio Sandbox (+14155238886) or Twilio WhatsApp sender
-  const fromNum = process.env.TWILIO_WHATSAPP_NUMBER || process.env.TWILIO_WHATSAPP_FROM || '+14155238886';
-  const fromWhatsApp = fromNum.startsWith('whatsapp:') ? fromNum : `whatsapp:${fromNum}`;
+
+  const fromRaw = process.env.TWILIO_WHATSAPP_NUMBER || process.env.TWILIO_WHATSAPP_FROM || '+14155238886';
+  const fromWhatsApp = String(fromRaw).trim().startsWith('whatsapp:')
+    ? String(fromRaw).trim()
+    : `whatsapp:${toE164Phone(fromRaw)}`;
   const toWhatsApp = `whatsapp:${formattedPhone}`;
 
   const auth = Buffer.from(`${process.env.TWILIO_ACCOUNT_SID}:${process.env.TWILIO_AUTH_TOKEN}`).toString('base64');
 
+  const useTemplate =
+    String(process.env.TWILIO_USE_TEMPLATE || '').toLowerCase() === 'true' &&
+    Boolean((process.env.TWILIO_CONTENT_SID || process.env.TWILIO_WHATSAPP_CONTENT_SID || '').trim());
+  const contentSid = (process.env.TWILIO_CONTENT_SID || process.env.TWILIO_WHATSAPP_CONTENT_SID || '').trim();
+
+  // Default: 24-hour session message (Body + image). Template send only if TWILIO_USE_TEMPLATE=true.
+  if (useTemplate && contentSid) {
+    const contentVariables = {};
+    const recipientVar = process.env.TWILIO_CONTENT_VAR_RECIPIENT;
+    const senderVar = process.env.TWILIO_CONTENT_VAR_SENDER;
+    const relationshipVar = process.env.TWILIO_CONTENT_VAR_RELATIONSHIP;
+    const messageVar = process.env.TWILIO_CONTENT_VAR_MESSAGE;
+    const mediaVar = process.env.TWILIO_CONTENT_VAR_MEDIA;
+
+    if (recipientVar) contentVariables[recipientVar] = recipientName || 'Friend';
+    if (senderVar) contentVariables[senderVar] = senderName || 'Someone who cares';
+    if (relationshipVar) contentVariables[relationshipVar] = relationship || 'Supporter';
+    if (messageVar) contentVariables[messageVar] = String(messageText || '').slice(0, 900);
+    if (mediaVar && mediaUrl) {
+      const useFullMediaUrl = String(process.env.TWILIO_CONTENT_MEDIA_FULL_URL || '').toLowerCase() === 'true';
+      contentVariables[mediaVar] = useFullMediaUrl ? mediaUrl : mediaPathForTemplate(mediaUrl);
+    }
+
+    const params = new URLSearchParams();
+    params.append('From', fromWhatsApp);
+    params.append('To', toWhatsApp);
+    params.append('ContentSid', contentSid);
+    if (Object.keys(contentVariables).length > 0) {
+      params.append('ContentVariables', JSON.stringify(contentVariables));
+    }
+    if (process.env.TWILIO_MESSAGING_SERVICE_SID) {
+      params.append('MessagingServiceSid', process.env.TWILIO_MESSAGING_SERVICE_SID.trim());
+    }
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${auth}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: params.toString(),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      console.error('[Twilio WhatsApp Template Error]:', data);
+      throw new Error(data.message || 'Twilio WhatsApp template send failed.');
+    }
+
+    return {
+      success: true,
+      sid: data.sid,
+      status: data.status,
+      mediaAttached: Boolean(mediaUrl),
+      provider: 'twilio-whatsapp-template',
+    };
+  }
+
   const baseCaption = `🎀 *October Breast Cancer Awareness Month*\n\nTo: ${recipientName}\nFrom: ${senderName} (${relationship || 'Supporter'})\n\n"${messageText}"\n\n🌸 *SGPGIMS Breast Health Program* - www.sgpgibreasthealth.org.in\nHelpline: 0522-2496200`;
 
-  // 1. First Attempt: Send with embedded MediaUrl (works on upgraded accounts or supported sandbox media)
   if (mediaUrl) {
     try {
       const params = new URLSearchParams();
@@ -140,12 +226,15 @@ async function sendTwilioWhatsApp({ toPhone, recipientName, senderName, relation
       }
 
       console.warn('[Twilio WhatsApp] MediaUrl attempt returned error, falling back to text + card link:', data?.message);
+      if (isOutsideSessionWindow(data)) {
+        throw new Error(sessionWindowError(toWhatsApp));
+      }
     } catch (err) {
+      if (err.message && err.message.includes('24-hour')) throw err;
       console.warn('[Twilio WhatsApp] MediaUrl attempt error, falling back to text:', err.message);
     }
   }
 
-  // 2. Second Attempt (Safe Fallback for Trial Accounts): Send message with direct Card Link
   const fallbackCaption = mediaUrl
     ? `${baseCaption}\n\n🖼️ *View & Download Your Personalized Card:*\n${mediaUrl}`
     : baseCaption;
@@ -168,8 +257,9 @@ async function sendTwilioWhatsApp({ toPhone, recipientName, senderName, relation
   if (!fallbackResponse.ok) {
     console.error('[Twilio WhatsApp Fallback Error]:', fallbackData);
     throw new Error(
-      fallbackData.message ||
-      'Failed to dispatch WhatsApp message. (If using Twilio Sandbox, make sure your phone sent the join code to +14155238886).'
+      isOutsideSessionWindow(fallbackData)
+        ? sessionWindowError(toWhatsApp)
+        : fallbackData.message || 'Failed to dispatch WhatsApp message.'
     );
   }
 
@@ -339,10 +429,9 @@ const handleSendRequest = async (req, res) => {
 
     if (cardFilePath) {
       const filename = path.basename(cardFilePath);
-      // Construct public URL for Twilio to download image
       const host = req.get('x-forwarded-host') || req.get('host');
       const protocol = req.get('x-forwarded-proto') || req.protocol;
-      const baseUrl = process.env.PUBLIC_APP_URL || `${protocol}://${host}`;
+      const baseUrl = (process.env.PUBLIC_APP_URL || `${protocol}://${host}`).replace(/\/+$/, '');
       publicMediaUrl = `${baseUrl}/temp_uploads/${filename}`;
     }
 
@@ -416,6 +505,7 @@ app.get('/api/health', (req, res) => {
     status: 'ok',
     service: 'Pink Hope Breast Cancer Awareness Backend',
     twilioWhatsAppConfigured: Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN),
+    twilioTemplateConfigured: Boolean(process.env.TWILIO_CONTENT_SID || process.env.TWILIO_WHATSAPP_CONTENT_SID),
     resendEmailConfigured: Boolean(process.env.RESEND_API_KEY),
     smtpConfigured: Boolean(process.env.SMTP_HOST && process.env.SMTP_USER),
   });
@@ -435,6 +525,11 @@ function startServer(port) {
     console.log(`\n🌸 Pink Hope Server running at http://localhost:${port}`);
     console.log(`   Health Check: http://localhost:${port}/api/health`);
     console.log(`   Twilio WhatsApp API: ${process.env.TWILIO_ACCOUNT_SID ? '✅ Configured' : 'ℹ️  Mock Mode'}`);
+    console.log(
+      `   WhatsApp send mode: ${
+        String(process.env.TWILIO_USE_TEMPLATE || '').toLowerCase() === 'true' ? 'Template (ContentSid)' : '24-hour session (text + image)'
+      }`
+    );
     console.log(`   Resend Email API: ${process.env.RESEND_API_KEY ? '✅ Configured (HTTPS REST API)' : 'ℹ️  Mock Mode (Add RESEND_API_KEY in Render)'}\n`);
   });
 
