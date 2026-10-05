@@ -7,10 +7,11 @@ import path from 'path';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 
-dotenv.config();
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Always load the project-root .env, even when the process is started from server/
+dotenv.config({ path: path.join(__dirname, '../.env') });
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '5001', 10);
@@ -108,8 +109,9 @@ async function sendTwilioWhatsApp({ toPhone, recipientName, senderName, relation
   const endpoint = `https://api.twilio.com/2010-04-01/Accounts/${process.env.TWILIO_ACCOUNT_SID}/Messages.json`;
   
   // From number: Twilio Sandbox (+14155238886) or Twilio WhatsApp sender
-  const fromNum = process.env.TWILIO_WHATSAPP_NUMBER || process.env.TWILIO_WHATSAPP_FROM || '+14155238886';
-  const fromWhatsApp = fromNum.startsWith('whatsapp:') ? fromNum : `whatsapp:${fromNum}`;
+  const fromRaw = process.env.TWILIO_WHATSAPP_NUMBER || process.env.TWILIO_WHATSAPP_FROM || '+14155238886';
+  const fromDigits = `+${String(fromRaw).replace(/[^\d]/g, '')}`;
+  const fromWhatsApp = fromRaw.trim().startsWith('whatsapp:') ? fromRaw.trim() : `whatsapp:${fromDigits}`;
   const toWhatsApp = `whatsapp:${formattedPhone}`;
 
   const auth = Buffer.from(`${process.env.TWILIO_ACCOUNT_SID}:${process.env.TWILIO_AUTH_TOKEN}`).toString('base64');
