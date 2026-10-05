@@ -48,7 +48,7 @@ export const CardPreview = forwardRef(({
     <div
       ref={ref}
       id="greeting-card-export"
-      className={`relative w-full max-w-[680px] min-h-[380px] sm:min-h-[420px] rounded-3xl overflow-hidden p-6 sm:p-8 shadow-card-pink border-2 bg-gradient-to-br ${currentStyle.bgClass} select-none text-[#3B1A2B] flex flex-col justify-between ${className}`}
+      className={`relative w-full max-w-[680px] min-h-[620px] sm:min-h-[640px] rounded-3xl overflow-hidden p-5 sm:p-7 pb-8 shadow-card-pink border-2 bg-gradient-to-br ${currentStyle.bgClass} select-none text-[#3B1A2B] flex flex-col justify-between ${className}`}
       style={{ borderColor: currentStyle.borderColor }}
     >
       {/* Background Watermark Ribbon Glow */}
@@ -84,10 +84,10 @@ export const CardPreview = forwardRef(({
       </div>
 
       {/* Main Body Grid */}
-      <div className="grid grid-cols-12 gap-3 sm:gap-4 items-center my-3 relative z-10">
+      <div className="grid grid-cols-12 gap-3 sm:gap-4 items-center my-2 relative z-10 min-w-0">
         
         {/* Left Column: 4 Core Icons */}
-        <div className="col-span-4 sm:col-span-4 space-y-2">
+        <div className="col-span-4 sm:col-span-4 min-w-0 space-y-1.5">
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded-full bg-pink-500/15 flex items-center justify-center text-[#E0157A] flex-shrink-0">
               <Search className="w-3.5 h-3.5" />
@@ -130,7 +130,7 @@ export const CardPreview = forwardRef(({
         </div>
 
         {/* Center: Photo Frame with Satin Ribbon Weaving */}
-        <div className="col-span-4 sm:col-span-4 flex justify-center relative">
+        <div className="col-span-4 sm:col-span-4 min-w-0 flex justify-center relative">
           
           {/* Decorative Floral Cherry Blossoms around frame */}
           <div className="absolute -top-3 -left-3 text-[#E0157A] opacity-90 z-20 pointer-events-none">
@@ -165,8 +165,8 @@ export const CardPreview = forwardRef(({
         </div>
 
         {/* Right Column: Ribbon & Hope Symbol */}
-        <div className="col-span-4 sm:col-span-4 flex flex-col items-center justify-center relative">
-          <div className="w-28 sm:w-36 md:w-40 h-36 sm:h-48 md:h-52 flex items-center justify-center">
+        <div className="col-span-4 sm:col-span-4 min-w-0 flex flex-col items-center justify-center relative">
+          <div className="w-24 sm:w-32 md:w-36 h-32 sm:h-44 md:h-48 flex items-center justify-center">
             <img
               src="/assets/images/pink-ribbon.png"
               alt="Authentic Pink Awareness Ribbon"
@@ -183,36 +183,36 @@ export const CardPreview = forwardRef(({
       </div>
 
       {/* Bottom Row: Dedication Box (Left) & Inspiring Message (Right) */}
-      <div className="grid grid-cols-12 gap-3 sm:gap-4 items-end relative z-10 pt-2 border-t border-pink-300/40">
+      <div className="grid grid-cols-12 gap-3 sm:gap-4 items-start relative z-10 pt-3 border-t border-pink-300/40 min-w-0">
         
         {/* Dedication Fill-in Fields (Left) */}
-        <div className="col-span-6 bg-white/70 backdrop-blur-sm p-2.5 sm:p-3 rounded-xl border border-pink-200/80 shadow-sm space-y-1">
+        <div className="col-span-6 min-w-0 bg-white/70 backdrop-blur-sm p-2.5 sm:p-3 rounded-xl border border-pink-200/80 shadow-sm space-y-1">
           <div className="flex items-center text-[10px] sm:text-[11px]">
-            <span className="font-bold text-[#7A0B3F] w-12">To:</span>
-            <span className="font-medium text-[#3B1A2B] truncate border-b border-pink-300 flex-1">
+            <span className="font-bold text-[#7A0B3F] w-11 flex-shrink-0">To:</span>
+            <span className="font-medium text-[#3B1A2B] truncate border-b border-pink-300 flex-1 min-w-0">
               {recipient || '...'}
             </span>
           </div>
           <div className="flex items-center text-[10px] sm:text-[11px]">
-            <span className="font-bold text-[#7A0B3F] w-12">From:</span>
-            <span className="font-medium text-[#3B1A2B] truncate border-b border-pink-300 flex-1">
+            <span className="font-bold text-[#7A0B3F] w-11 flex-shrink-0">From:</span>
+            <span className="font-medium text-[#3B1A2B] truncate border-b border-pink-300 flex-1 min-w-0">
               {sender || '...'}
             </span>
           </div>
           <div className="flex items-center text-[10px] sm:text-[11px]">
-            <span className="font-bold text-[#7A0B3F] w-12">In:</span>
-            <span className="font-medium text-pink-700 truncate border-b border-pink-300 flex-1">
+            <span className="font-bold text-[#7A0B3F] w-11 flex-shrink-0">In:</span>
+            <span className="font-medium text-pink-700 truncate border-b border-pink-300 flex-1 min-w-0">
               {relationship || 'Friend / Loved One'}
             </span>
           </div>
         </div>
 
         {/* Heartfelt Message (Right) */}
-        <div className="col-span-6 text-right">
+        <div className="col-span-6 min-w-0 text-right">
           <p className="font-serif italic text-[11px] sm:text-xs text-[#7A0B3F] font-semibold leading-tight">
             "Your strength inspires, your courage gives hope, your journey matters."
           </p>
-          <p className="text-[10px] sm:text-[11px] text-[#3B1A2B]/90 mt-1 line-clamp-3 leading-snug">
+          <p className="text-[10px] sm:text-[11px] text-[#3B1A2B]/90 mt-1 leading-snug line-clamp-5 break-words">
             {personalNote ? `${personalNote} — ${messageText}` : messageText}
           </p>
         </div>
@@ -220,7 +220,7 @@ export const CardPreview = forwardRef(({
       </div>
 
       {/* Official SGPGI Initiative Small Footer Stamp */}
-      <div className="absolute bottom-1 right-3 text-[8px] text-[#9D174D]/60 tracking-wider">
+      <div className="absolute bottom-2 right-3 text-[8px] text-[#9D174D]/60 tracking-wider">
         SGPGI Breast Health Program • Lucknow
       </div>
     </div>

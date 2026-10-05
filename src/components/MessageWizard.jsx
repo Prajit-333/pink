@@ -254,7 +254,10 @@ export const MessageWizard = () => {
       if (response.ok) {
         const data = await response.json();
         console.log('[Pink Hope] Card dispatched via backend:', data);
-        sentViaBackend = true;
+        sentViaBackend = channel === 'whatsapp' ? data.result?.mediaAttached === true : true;
+        if (channel === 'whatsapp' && !sentViaBackend) {
+          console.warn('[Pink Hope] Backend delivered WhatsApp text without the card image; opening the native share flow instead.');
+        }
       } else {
         const errData = await response.json().catch(() => ({}));
         console.warn('[Pink Hope] Backend dispatch response error:', errData);
