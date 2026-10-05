@@ -219,6 +219,13 @@ export const MessageWizard = () => {
       }
 
       try {
+        // Some WhatsApp Web share targets ignore ShareData.text when a file is attached.
+        // Copy the caption first so it can be pasted into the caption field on those clients.
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(fullTextBody);
+          setCopiedMessageText(true);
+          setTimeout(() => setCopiedMessageText(false), 3000);
+        }
         await navigator.share({
           title: `Breast Cancer Awareness Card for ${recipient}`,
           text: fullTextBody,
@@ -903,7 +910,12 @@ export const MessageWizard = () => {
             {channel !== 'email' && (
               <>
                 <p className="text-xs sm:text-sm text-ink/80 dark:text-pink-200/80 mb-5 leading-relaxed">
-                  Your greeting card and personal dedication for <strong className="text-pink-700 dark:text-pink-300">{recipient}</strong> have been processed for delivery.
+                  Your greeting card and personal dedication for <strong className="text-pink-700 dark:text-pink-300">{recipient}</strong> are ready to share.
+                  {copiedMessageText && (
+                    <span className="block mt-2 text-emerald-700 dark:text-emerald-300 font-semibold">
+                Caption copied. Paste it into WhatsApp if the caption field is empty.
+                    </span>
+                  )}
                 </p>
 
                 {/* Quick Actions */}
