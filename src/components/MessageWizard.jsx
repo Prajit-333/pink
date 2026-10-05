@@ -66,6 +66,9 @@ export const MessageWizard = () => {
   const [successModalOpen, setSuccessModalOpen] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedMessageText, setCopiedMessageText] = useState(false);
+  const [copiedCardImage, setCopiedCardImage] = useState(false);
+  const [cardImageClipboardError, setCardImageClipboardError] = useState('');
+  const [cardImageForClipboard, setCardImageForClipboard] = useState(null);
   const [generatedLinks, setGeneratedLinks] = useState({
     whatsapp: '',
     gmail: '',
@@ -139,6 +142,29 @@ export const MessageWizard = () => {
     }
   };
 
+  const copyCardImageToClipboard = async () => {
+    setCardImageClipboardError('');
+    if (!cardImageForClipboard) {
+      setCardImageClipboardError('The card image is not available to copy.');
+      return;
+    }
+    if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
+      setCardImageClipboardError('Image clipboard is not supported in this browser. Download the card and attach it manually.');
+      return;
+    }
+
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({ [cardImageForClipboard.type || 'image/png']: cardImageForClipboard }),
+      ]);
+      setCopiedCardImage(true);
+      setTimeout(() => setCopiedCardImage(false), 3000);
+    } catch (err) {
+      console.error('Image clipboard copy failed:', err);
+      setCardImageClipboardError('The browser blocked image clipboard access. Download the card and attach it manually.');
+    }
+  };
+
   // Core Send Action: Direct dispatch to designated mail or mobile number without downloading locally
   const handleSendMessage = async (e) => {
     e.preventDefault();
@@ -165,6 +191,7 @@ export const MessageWizard = () => {
     if (cardBlob) {
       cardFile = new File([cardBlob], `Pink-Hope-Card-${recipient}.png`, { type: 'image/png' });
     }
+    setCardImageForClipboard(cardFile);
 
     // Clean Phone Number & Full Formatted Text
     const rawNumber = `${countryCode}${phoneNumber}`.replace(/[^0-9]/g, '');
@@ -818,6 +845,29 @@ export const MessageWizard = () => {
 
                 {/* Quick Actions */}
                 <div className="space-y-2.5 mb-6 text-left">
+                  {cardImageForClipboard && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={copyCardImageToClipboard}
+                        className="w-full py-3 px-4 rounded-2xl bg-pink-600 hover:bg-pink-700 text-white font-bold text-xs flex items-center justify-between shadow-md transition-all hover:scale-[1.02]"
+                      >
+                        <div className="flex items-center gap-2">
+                          {copiedCardImage ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                          <span>{copiedCardImage ? 'Card Image Copied' : 'Copy Card Image'}</span>
+                        </div>
+                        <span className="text-[10px] bg-pink-700/80 px-2 py-0.5 rounded-full">
+                          {copiedCardImage ? 'Paste in WhatsApp' : 'Copy'}
+                        </span>
+                      </button>
+                      {cardImageClipboardError && (
+                        <p className="text-[11px] text-red-600 dark:text-red-300 px-1" role="alert">
+                          {cardImageClipboardError}
+                        </p>
+                      )}
+                    </>
+                  )}
+
                   {generatedLinks.whatsapp && (
                     <a
                       href={generatedLinks.whatsapp}
