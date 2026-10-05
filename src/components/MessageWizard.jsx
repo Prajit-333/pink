@@ -64,6 +64,7 @@ export const MessageWizard = () => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [successModalOpen, setSuccessModalOpen] = useState(false);
+  const [sendError, setSendError] = useState('');
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedMessageText, setCopiedMessageText] = useState(false);
   const [copiedCardImage, setCopiedCardImage] = useState(false);
@@ -184,6 +185,7 @@ export const MessageWizard = () => {
     }
 
     setIsSending(true);
+    setSendError('');
 
     // Generate Card PNG Blob in memory for transmission
     const cardBlob = await generateCardImageBlob();
@@ -256,18 +258,24 @@ export const MessageWizard = () => {
         console.log('[Pink Hope] Card dispatched via backend:', data);
         sentViaBackend = channel === 'whatsapp' ? data.result?.mediaAttached === true : true;
         if (channel === 'whatsapp' && !sentViaBackend) {
-          console.warn('[Pink Hope] Backend delivered WhatsApp text without the card image; opening the native share flow instead.');
+          setSendError('Twilio did not attach the card image. Check the Render and Twilio logs, then try again.');
         }
       } else {
         const errData = await response.json().catch(() => ({}));
         console.warn('[Pink Hope] Backend dispatch response error:', errData);
+        if (channel === 'whatsapp') {
+          setSendError(errData.error || 'Twilio WhatsApp delivery failed.');
+        }
       }
     } catch (err) {
       console.warn('[Pink Hope] Backend connection error, proceeding with confirmation:', err);
+      if (channel === 'whatsapp') {
+        setSendError('The Twilio backend could not be reached. WhatsApp was not opened.');
+      }
     }
 
     // 2. Client-side direct transmission (Web Share API with image file on mobile, or direct app launch)
-    if (!sentViaBackend) {
+    if (!sentViaBackend && channel !== 'whatsapp') {
       let sharedViaWebShare = false;
       const shareFiles = [];
       if (cardFile) shareFiles.push(cardFile);
@@ -303,6 +311,9 @@ export const MessageWizard = () => {
     }
 
     setIsSending(false);
+    if (channel === 'whatsapp' && !sentViaBackend) {
+      return;
+    }
     setSuccessModalOpen(true);
 
     // Confetti burst
@@ -756,6 +767,12 @@ export const MessageWizard = () => {
                       <strong>Privacy Commitment:</strong> We respect your privacy. Messages and names are transmitted securely and never sold or stored beyond delivery.
                     </span>
                   </label>
+
+                  {sendError && (
+                    <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700" role="alert">
+                      {sendError}
+                    </p>
+                  )}
 
                   {/* Step 2 Actions */}
                   <div className="flex justify-between items-center pt-4 border-t border-pink-200 dark:border-pink-800">
