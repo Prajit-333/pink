@@ -1,5 +1,5 @@
-import React, { forwardRef } from 'react';
-import { Search, Stethoscope, Heart, Users, Sparkles } from 'lucide-react';
+import React, { forwardRef, useEffect, useRef, useState } from 'react';
+import { Search, Stethoscope, Heart, Users } from 'lucide-react';
 
 export const CARD_STYLES = [
   {
@@ -32,6 +32,254 @@ export const CARD_STYLES = [
   },
 ];
 
+const CARD_WIDTH = 1080;
+const CARD_HEIGHT = 1350;
+const NAME_MAX_CHARS = 36;     // fits 2 lines in a row
+const MESSAGE_MAX_CHARS = 150; // fits 5 lines in the right column
+
+const clipText = (value, maximum) => {
+  const text = String(value || '');
+  if (text.length <= maximum) return text;
+  return `${Array.from(text).slice(0, maximum - 1).join('').trimEnd()}…`;
+};
+
+const wrapSafe = {
+  minWidth: 0,
+  overflowWrap: 'anywhere',
+  wordBreak: 'break-word',
+};
+
+const CardCanvas = ({
+  canvasRef,
+  exportId,
+  recipient,
+  sender,
+  relationship,
+  messageText,
+  personalNote,
+  photoUrl,
+  currentStyle,
+}) => {
+  const rawMessage = personalNote ? `${personalNote} — ${messageText}` : messageText;
+  const safeMessage = clipText(rawMessage, MESSAGE_MAX_CHARS);
+  const sideItems = [
+    { Icon: Search, title: 'Be Aware', sub: 'Know the signs' },
+    { Icon: Stethoscope, title: 'Get Checked', sub: 'Regular screening saves' },
+    { Icon: Heart, title: 'Support', sub: 'Stand with survivors' },
+    { Icon: Users, title: 'Together', sub: 'We make a difference' },
+  ];
+  const rows = [
+  { label: 'To:', value: clipText(recipient || '...', NAME_MAX_CHARS), color: '#3B1A2B' },
+  { label: 'From:', value: clipText(sender || '...', NAME_MAX_CHARS), color: '#3B1A2B' },
+  { label: 'In:', value: clipText(relationship || 'Friend / Loved One', NAME_MAX_CHARS), color: '#BE185D' },
+];
+
+  return (
+    <div
+      ref={canvasRef}
+      id={exportId}
+      className={`greeting-card-export bg-gradient-to-br ${currentStyle.bgClass} text-[#3B1A2B] select-none`}
+      style={{
+        position: 'relative',
+        width: CARD_WIDTH,
+        height: CARD_HEIGHT,
+        minWidth: CARD_WIDTH,
+        maxWidth: 'none',
+        overflow: 'hidden',
+        boxSizing: 'border-box',
+        border: `8px solid ${currentStyle.borderColor}`,
+        borderRadius: 42,
+      }}
+    >
+      <div
+        style={{
+          position: 'absolute',
+          left: 190,
+          top: 330,
+          width: 700,
+          height: 700,
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(244,114,168,0.22) 0%, rgba(244,114,168,0) 70%)',
+        }}
+      />
+
+      <div style={{ position: 'absolute', left: 70, top: 70, width: 940, height: 230, overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', left: 0, top: 0, width: 650 }}>
+          <h2 className="font-script" style={{ fontSize: 100, lineHeight: 1.05, color: '#E0157A', margin: 0 }}>
+            Breast Cancer
+          </h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 6 }}>
+            <span className="font-sans" style={{ fontSize: 38, fontWeight: 800, letterSpacing: '0.22em', color: '#7A0B3F', whiteSpace: 'nowrap' }}>
+              AWARENESS MONTH
+            </span>
+            <span style={{ fontSize: 34, color: '#E0157A' }}>♥</span>
+          </div>
+          <p style={{ fontSize: 24, fontWeight: 500, color: '#9D174D', margin: '16px 0 0', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>
+            Early Detection | Timely Treatment | Brighter Tomorrows
+          </p>
+        </div>
+        <div style={{ position: 'absolute', right: 0, top: 10, width: 320, textAlign: 'right' }}>
+          <p className="font-script" style={{ fontSize: 50, lineHeight: 1.1, color: '#E0157A', margin: 0 }}>
+            Stronger Together
+          </p>
+          <p className="font-serif" style={{ fontSize: 24, fontStyle: 'italic', color: '#7A0B3F', margin: '6px 0 0' }}>
+            for a Healthier Tomorrow
+          </p>
+          <span style={{ fontSize: 28, color: '#E0157A' }}>♡</span>
+        </div>
+      </div>
+
+      <div
+        style={{
+          position: 'absolute',
+          left: 70,
+          top: 300,
+          width: 940,
+          height: 620,
+          display: 'grid',
+          gridTemplateColumns: '290px 350px 300px',
+          alignItems: 'center',
+        }}
+      >
+        <div style={{ ...wrapSafe, display: 'flex', flexDirection: 'column', gap: 26 }}>
+          {sideItems.map(({ Icon, title, sub }) => (
+            <div key={title} style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <div style={{ width: 60, height: 60, flexShrink: 0, borderRadius: '50%', background: 'rgba(236,72,153,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#E0157A' }}>
+                <Icon size={30} />
+              </div>
+              <div style={{ ...wrapSafe, lineHeight: 1.2 }}>
+                <span style={{ display: 'block', fontSize: 30, fontWeight: 700, color: '#7A0B3F' }}>{title}</span>
+                <span style={{ display: 'block', fontSize: 22, color: 'rgba(157,23,77,0.85)' }}>{sub}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ position: 'relative', width: 350, height: 540, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+          <div style={{ position: 'absolute', top: 6, left: 4, fontSize: 40, zIndex: 2 }}>🌸</div>
+          <div style={{ position: 'absolute', bottom: 6, right: 4, fontSize: 40, zIndex: 2 }}>🌺</div>
+          <div style={{ boxSizing: 'border-box', width: 320, height: 500, background: '#fff', padding: '16px 16px 0', borderRadius: 14, border: '2px solid #FBCFE8', boxShadow: '0 10px 30px rgba(224,21,122,0.18)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <div style={{ width: 284, height: 400, flexShrink: 0, borderRadius: 8, overflow: 'hidden', background: 'rgba(252,231,243,0.8)', border: '1px solid #FCE7F3', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {photoUrl ? (
+                <img src={photoUrl} alt="Recipient" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center', display: 'block' }} />
+              ) : (
+                <div style={{ textAlign: 'center', color: '#F472B6' }}>
+                  <div style={{ width: 84, height: 84, margin: '0 auto 12px', borderRadius: '50%', background: 'rgba(251,207,232,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Heart size={42} color="#EC4899" />
+                  </div>
+                  <span style={{ fontSize: 26, fontWeight: 600, color: '#DB2777' }}>You Are Loved</span>
+                </div>
+              )}
+            </div>
+            <p
+              className="font-serif"
+              style={{
+                ...wrapSafe,
+                width: 284,
+                margin: '14px 0 0',
+                fontSize: 28,
+                fontStyle: 'italic',
+                textAlign: 'center',
+                lineHeight: 1.3,
+                color: 'rgba(157,23,77,0.85)',
+              }}
+            >
+              {clipText(relationship || 'Together in Hope', 22)}
+            </p>
+          </div>
+        </div>
+
+        <div style={{ width: 300, height: 540, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: 250, height: 380, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <img src="/assets/images/pink-ribbon.png" alt="Authentic Pink Awareness Ribbon" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
+          </div>
+          <span className="font-script" style={{ fontSize: 44, fontWeight: 700, color: '#E0157A', marginTop: 20, whiteSpace: 'nowrap' }}>
+            You Are Strong
+          </span>
+        </div>
+      </div>
+
+      <div style={{ position: 'absolute', left: 70, top: 930, width: 940, height: 2, background: 'rgba(249,168,212,0.5)' }} />
+
+      {/* ================= FOOTER CONTENT (950px - 1270px): two equal columns ================= */}
+      <div
+        style={{
+          position: 'absolute',
+          left: 70,
+          top: 950,
+          width: 940,
+          height: 320,
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          columnGap: 40,
+        }}
+      >
+        {/* Left column: To / From / In */}
+        <div style={{ ...wrapSafe, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {rows.map((r) => (
+            <div
+              key={r.label}
+              style={{
+                boxSizing: 'border-box',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                height: 96,
+                padding: '10px 18px',
+                background: 'rgba(255,255,255,0.85)',
+                border: '2px solid #F9A8D4',
+                borderRadius: 18,
+                minWidth: 0,
+              }}
+            >
+              <span style={{ width: 92, flexShrink: 0, fontSize: 28, lineHeight: 1.3, fontWeight: 700, color: '#7A0B3F' }}>
+                {r.label}
+              </span>
+              <span
+                style={{
+                  ...wrapSafe,
+                  flex: 1,
+                  fontSize: 28,
+                  lineHeight: 1.25,
+                  fontWeight: 500,
+                  color: r.color,
+                }}
+              >
+                {r.value}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {/* Right column: quote + message */}
+        <div style={{ ...wrapSafe, textAlign: 'right' }}>
+          <p
+            className="font-serif"
+            style={{ ...wrapSafe, margin: 0, fontSize: 25, lineHeight: '32px', fontStyle: 'italic', fontWeight: 600, color: '#7A0B3F' }}
+          >
+            "Your strength inspires, your courage gives hope, your journey matters."
+          </p>
+          <p
+            style={{
+              ...wrapSafe,
+              margin: '14px 0 0',
+              fontSize: 24,
+              lineHeight: '32px',
+              color: 'rgba(59,26,43,0.92)',
+            }}
+          >
+            {safeMessage}
+          </p>
+        </div>
+      </div>
+
+      <div style={{ position: 'absolute', left: 70, top: 1290, width: 940, height: 40, lineHeight: '40px', textAlign: 'right', fontSize: 22, letterSpacing: '0.06em', color: 'rgba(157,23,77,0.7)', whiteSpace: 'nowrap' }}>
+        SGPGI Breast Health Program • Lucknow
+      </div>
+    </div>
+  );
+};
+
 export const CardPreview = forwardRef(({
   recipient = 'Beloved Mother',
   sender = 'With All My Heart',
@@ -42,188 +290,34 @@ export const CardPreview = forwardRef(({
   styleId = 'satin-pink',
   className = '',
 }, ref) => {
-  const currentStyle = CARD_STYLES.find((s) => s.id === styleId) || CARD_STYLES[0];
+  const currentStyle = CARD_STYLES.find((style) => style.id === styleId) || CARD_STYLES[0];
+  const wrapRef = useRef(null);
+  const [scale, setScale] = useState(0.5);
+
+  useEffect(() => {
+    const element = wrapRef.current;
+    if (!element) return undefined;
+    const updateScale = () => setScale(element.clientWidth / CARD_WIDTH);
+    updateScale();
+    const observer = new ResizeObserver(updateScale);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  const sharedProps = { recipient, sender, relationship, messageText, personalNote, photoUrl, currentStyle };
 
   return (
-    <div
-      ref={ref}
-      id="greeting-card-export"
-      className={`relative w-full max-w-[680px] min-h-[620px] sm:min-h-[640px] rounded-3xl overflow-hidden p-5 sm:p-7 pb-8 shadow-card-pink border-2 bg-gradient-to-br ${currentStyle.bgClass} select-none text-[#3B1A2B] flex flex-col justify-between ${className}`}
-      style={{ borderColor: currentStyle.borderColor }}
-    >
-      {/* Background Watermark Ribbon Glow */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[340px] h-[340px] bg-pink-400/10 rounded-full blur-3xl pointer-events-none" />
-
-      {/* Top Header Row */}
-      <div className="flex items-start justify-between relative z-10">
-        <div>
-          <h2 className="font-script text-3xl sm:text-4xl text-[#E0157A] leading-none">
-            Breast Cancer
-          </h2>
-          <div className="flex items-center gap-1.5 mt-0.5">
-            <span className="font-sans font-extrabold tracking-[0.25em] text-xs sm:text-sm text-[#7A0B3F] uppercase">
-              AWARENESS MONTH
-            </span>
-            <span className="text-[#E0157A] text-xs">♥</span>
-          </div>
-          <p className="text-[10px] sm:text-[11px] font-medium text-[#9D174D]/90 mt-1 tracking-wider">
-            Early Detection | Timely Treatment | Brighter Tomorrows
-          </p>
-        </div>
-
-        {/* Right Corner Script Tagline */}
-        <div className="text-right hidden sm:block">
-          <p className="font-script text-xl sm:text-2xl text-[#E0157A] leading-tight">
-            Stronger Together
-          </p>
-          <p className="font-serif italic text-[11px] text-[#7A0B3F]">
-            for a Healthier Tomorrow
-          </p>
-          <span className="text-[#E0157A] text-xs">♡</span>
+    <>
+      <div ref={wrapRef} className={`relative w-full max-w-[680px] overflow-hidden shadow-card-pink ${className}`} style={{ height: CARD_HEIGHT * scale }}>
+        <div style={{ width: CARD_WIDTH, height: CARD_HEIGHT, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
+          <CardCanvas {...sharedProps} />
         </div>
       </div>
 
-      {/* Main Body Grid */}
-      <div className="grid grid-cols-12 gap-3 sm:gap-4 items-center my-2 relative z-10 min-w-0">
-        
-        {/* Left Column: 4 Core Icons */}
-        <div className="col-span-4 sm:col-span-4 min-w-0 space-y-1.5">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-full bg-pink-500/15 flex items-center justify-center text-[#E0157A] flex-shrink-0">
-              <Search className="w-3.5 h-3.5" />
-            </div>
-            <div className="leading-tight">
-              <span className="block text-[11px] font-bold text-[#7A0B3F]">Be Aware</span>
-              <span className="block text-[9px] text-[#9D174D]/80">Know the signs</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-full bg-pink-500/15 flex items-center justify-center text-[#E0157A] flex-shrink-0">
-              <Stethoscope className="w-3.5 h-3.5" />
-            </div>
-            <div className="leading-tight">
-              <span className="block text-[11px] font-bold text-[#7A0B3F]">Get Checked</span>
-              <span className="block text-[9px] text-[#9D174D]/80">Regular screening saves</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-full bg-pink-500/15 flex items-center justify-center text-[#E0157A] flex-shrink-0">
-              <Heart className="w-3.5 h-3.5" />
-            </div>
-            <div className="leading-tight">
-              <span className="block text-[11px] font-bold text-[#7A0B3F]">Support</span>
-              <span className="block text-[9px] text-[#9D174D]/80">Stand with survivors</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-full bg-pink-500/15 flex items-center justify-center text-[#E0157A] flex-shrink-0">
-              <Users className="w-3.5 h-3.5" />
-            </div>
-            <div className="leading-tight">
-              <span className="block text-[11px] font-bold text-[#7A0B3F]">Together</span>
-              <span className="block text-[9px] text-[#9D174D]/80">We make a difference</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Center: Photo Frame with Satin Ribbon Weaving */}
-        <div className="col-span-4 sm:col-span-4 min-w-0 flex justify-center relative">
-          
-          {/* Decorative Floral Cherry Blossoms around frame */}
-          <div className="absolute -top-3 -left-3 text-[#E0157A] opacity-90 z-20 pointer-events-none">
-            🌸
-          </div>
-          <div className="absolute -bottom-2 -right-2 text-[#EC4899] opacity-90 z-20 pointer-events-none">
-            🌺
-          </div>
-
-          {/* Polaroid-style photo frame */}
-          <div className="relative bg-white p-2 sm:p-2.5 pb-4 sm:pb-5 rounded-lg shadow-lg border border-pink-200 transform -rotate-1 hover:rotate-0 transition-transform duration-300 w-28 sm:w-36">
-            <div className="w-full aspect-[4/5] bg-pink-100/60 rounded overflow-hidden flex items-center justify-center border border-pink-100">
-              {photoUrl ? (
-                <img
-                  src={photoUrl}
-                  alt="Recipient"
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="flex flex-col items-center justify-center p-2 text-center text-pink-400">
-                  <div className="w-10 h-10 rounded-full bg-pink-200/60 flex items-center justify-center mb-1">
-                    <Heart className="w-5 h-5 text-pink-500" />
-                  </div>
-                  <span className="text-[10px] font-semibold text-pink-600">You Are Loved</span>
-                </div>
-              )}
-            </div>
-            <p className="text-[9px] font-serif italic text-center text-pink-800/80 mt-1">
-              {relationship || 'Together in Hope'}
-            </p>
-          </div>
-        </div>
-
-        {/* Right Column: Ribbon & Hope Symbol */}
-        <div className="col-span-4 sm:col-span-4 min-w-0 flex flex-col items-center justify-center relative">
-          <div className="w-24 sm:w-32 md:w-36 h-32 sm:h-44 md:h-48 flex items-center justify-center">
-            <img
-              src="/assets/images/pink-ribbon.png"
-              alt="Authentic Pink Awareness Ribbon"
-              className="w-full h-full object-contain filter drop-shadow-[0_10px_20px_rgba(224,21,122,0.35)] transform hover:scale-105 transition-transform"
-            />
-          </div>
-          <div className="text-center mt-0.5">
-            <span className="text-[12px] sm:text-sm font-script text-[#E0157A] block font-bold">
-              You Are Strong
-            </span>
-          </div>
-        </div>
-
+      <div aria-hidden="true" style={{ position: 'fixed', left: -10000, top: 0, width: CARD_WIDTH, height: CARD_HEIGHT, pointerEvents: 'none' }}>
+        <CardCanvas canvasRef={ref} exportId="greeting-card-export" {...sharedProps} />
       </div>
-
-      {/* Bottom Row: Dedication Box (Left) & Inspiring Message (Right) */}
-      <div className="grid grid-cols-12 gap-3 sm:gap-4 items-start relative z-10 pt-3 border-t border-pink-300/40 min-w-0">
-        
-        {/* Dedication Fill-in Fields (Left) */}
-        <div className="col-span-6 min-w-0 bg-white/70 backdrop-blur-sm p-2.5 sm:p-3 rounded-xl border border-pink-200/80 shadow-sm space-y-1">
-          <div className="flex items-center text-[10px] sm:text-[11px]">
-            <span className="font-bold text-[#7A0B3F] w-11 flex-shrink-0">To:</span>
-            <span className="font-medium text-[#3B1A2B] truncate border-b border-pink-300 flex-1 min-w-0">
-              {recipient || '...'}
-            </span>
-          </div>
-          <div className="flex items-center text-[10px] sm:text-[11px]">
-            <span className="font-bold text-[#7A0B3F] w-11 flex-shrink-0">From:</span>
-            <span className="font-medium text-[#3B1A2B] truncate border-b border-pink-300 flex-1 min-w-0">
-              {sender || '...'}
-            </span>
-          </div>
-          <div className="flex items-center text-[10px] sm:text-[11px]">
-            <span className="font-bold text-[#7A0B3F] w-11 flex-shrink-0">In:</span>
-            <span className="font-medium text-pink-700 truncate border-b border-pink-300 flex-1 min-w-0">
-              {relationship || 'Friend / Loved One'}
-            </span>
-          </div>
-        </div>
-
-        {/* Heartfelt Message (Right) */}
-        <div className="col-span-6 min-w-0 text-right">
-          <p className="font-serif italic text-[11px] sm:text-xs text-[#7A0B3F] font-semibold leading-tight">
-            "Your strength inspires, your courage gives hope, your journey matters."
-          </p>
-          <p className="text-[10px] sm:text-[11px] text-[#3B1A2B]/90 mt-1 leading-snug line-clamp-5 break-words">
-            {personalNote ? `${personalNote} — ${messageText}` : messageText}
-          </p>
-        </div>
-
-      </div>
-
-      {/* Official SGPGI Initiative Small Footer Stamp */}
-      <div className="absolute bottom-2 right-3 text-[8px] text-[#9D174D]/60 tracking-wider">
-        SGPGI Breast Health Program • Lucknow
-      </div>
-    </div>
+    </>
   );
 });
 

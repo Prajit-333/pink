@@ -124,21 +124,71 @@ export const MessageWizard = () => {
     setShowEmojiPicker(false);
   };
 
-  // Export card to PNG canvas in memory
+  // Wait until every image inside the card has loaded (or failed).
+  const waitForImages = async (element) => {
+    const images = Array.from(element.querySelectorAll('img'));
+    await Promise.all(
+      images.map((img) => {
+        if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+        return new Promise((resolve) => {
+          const finish = () => {
+            img.removeEventListener('load', finish);
+            img.removeEventListener('error', finish);
+            resolve();
+          };
+          img.addEventListener('load', finish, { once: true });
+          img.addEventListener('error', finish, { once: true });
+        });
+      })
+    );
+  };
+
+  // Export card to PNG (fixed 1080x1350 canvas).
   const generateCardImageBlob = async () => {
     if (!cardRef.current) return null;
+
     try {
+      await document.fonts.ready;
+      await waitForImages(cardRef.current);
+
       const canvas = await html2canvas(cardRef.current, {
-        scale: 2,
+        width: 1080,
+        height: 1350,
+        windowWidth: 1080,
+        windowHeight: 1350,
+        x: 0,
+        y: 0,
+        scrollX: 0,
+        scrollY: 0,
+        scale: 1,
         useCORS: true,
-        allowTaint: true,
+        allowTaint: false,
         backgroundColor: '#FFF1F6',
+        logging: false,
+        // Move the off-screen export card into the clone's viewport.
+        onclone: (clonedDoc) => {
+          const element = clonedDoc.getElementById('greeting-card-export');
+          if (element && element.parentElement) {
+            element.parentElement.style.left = '0px';
+            element.parentElement.style.top = '0px';
+          }
+        },
       });
-      return new Promise((resolve) => {
-        canvas.toBlob((blob) => resolve(blob), 'image/png', 0.95);
+
+      return await new Promise((resolve, reject) => {
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error('Failed to create greeting card PNG.'));
+            }
+          },
+          'image/png'
+        );
       });
-    } catch (err) {
-      console.error('Canvas export error:', err);
+    } catch (error) {
+      console.error('Card image export failed:', error);
       return null;
     }
   };
