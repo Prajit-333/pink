@@ -5,6 +5,7 @@ import nodemailer from 'nodemailer';
 import fs from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -15,9 +16,78 @@ dotenv.config({ path: path.join(__dirname, '../.env') });
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '5001', 10);
+const reportFilePath = process.env.REPORT_DATA_FILE
+  ? path.resolve(process.env.REPORT_DATA_FILE)
+  : path.join(__dirname, 'message-report.json');
 
 app.use(cors());
 app.use(express.json());
+
+const emptyReport = () => ({
+  events: [],
+  visitors: [],
+  daily: {},
+  byChannel: {},
+});
+
+function readReport() {
+  try {
+    if (!fs.existsSync(reportFilePath)) return emptyReport();
+    const parsed = JSON.parse(fs.readFileSync(reportFilePath, 'utf8'));
+    return {
+      events: Array.isArray(parsed.events) ? parsed.events : [],
+      visitors: Array.isArray(parsed.visitors) ? parsed.visitors : [],
+      daily: parsed.daily && typeof parsed.daily === 'object' ? parsed.daily : {},
+      byChannel: parsed.byChannel && typeof parsed.byChannel === 'object' ? parsed.byChannel : {},
+    };
+  } catch (error) {
+    console.error('[Message Report] Could not read report data:', error);
+    return emptyReport();
+  }
+}
+
+function writeReport(report) {
+  const directory = path.dirname(reportFilePath);
+  if (!fs.existsSync(directory)) fs.mkdirSync(directory, { recursive: true });
+  const temporaryPath = `${reportFilePath}.tmp`;
+  fs.writeFileSync(temporaryPath, JSON.stringify(report, null, 2));
+  fs.renameSync(temporaryPath, reportFilePath);
+}
+
+function hashVisitorId(visitorId) {
+  return crypto.createHash('sha256').update(String(visitorId || '')).digest('hex');
+}
+
+function recordMessageEvent({ eventId, visitorId, channel }) {
+  if (!eventId) return false;
+  const report = readReport();
+  if (report.events.includes(eventId)) return false;
+
+  const day = new Date().toISOString().slice(0, 10);
+  const safeChannel = ['whatsapp', 'sms', 'email'].includes(channel) ? channel : 'unknown';
+  report.events.push(eventId);
+  if (visitorId) {
+    const visitorHash = hashVisitorId(visitorId);
+    if (!report.visitors.includes(visitorHash)) report.visitors.push(visitorHash);
+  }
+  report.daily[day] = (report.daily[day] || 0) + 1;
+  report.byChannel[safeChannel] = (report.byChannel[safeChannel] || 0) + 1;
+  writeReport(report);
+  return true;
+}
+
+function isValidReportToken(req) {
+  const configuredToken = String(process.env.ADMIN_REPORT_TOKEN || '');
+  const suppliedToken = String(
+    req.get('authorization')?.replace(/^Bearer\s+/i, '') ||
+      req.get('x-admin-report-token') ||
+      ''
+  );
+  if (!configuredToken || !suppliedToken) return false;
+  const expected = Buffer.from(configuredToken);
+  const supplied = Buffer.from(suppliedToken);
+  return expected.length === supplied.length && crypto.timingSafeEqual(expected, supplied);
+}
 
 // Temporary upload directory for greeting card images
 const uploadDir = path.join(__dirname, 'temp_uploads');
@@ -418,6 +488,8 @@ const handleSendRequest = async (req, res) => {
       phone = '',
       email = '',
       emailAddress = '',
+      eventId = '',
+      visitorId = '',
     } = req.body;
 
     const finalMessage = message || messageText || 'Thinking of you with courage, strength, and love.';
@@ -476,6 +548,12 @@ const handleSendRequest = async (req, res) => {
       return res.status(400).json({ error: `Unsupported channel: ${channel}` });
     }
 
+    try {
+      recordMessageEvent({ eventId, visitorId, channel });
+    } catch (reportError) {
+      console.error('[Message Report] Could not record a completed send:', reportError);
+    }
+
     return res.status(200).json({
       success: true,
       channel,
@@ -498,6 +576,35 @@ const uploadMiddleware = upload.fields([
 
 app.post('/api/send-card', rateLimiter, uploadMiddleware, handleSendRequest);
 app.post('/api/send-message', rateLimiter, uploadMiddleware, handleSendRequest);
+
+app.post('/api/message-events', rateLimiter, (req, res) => {
+  const { eventId = '', visitorId = '', channel = '' } = req.body || {};
+  if (!eventId || !visitorId) {
+    return res.status(400).json({ error: 'eventId and visitorId are required.' });
+  }
+
+  recordMessageEvent({ eventId, visitorId, channel });
+  return res.status(204).send();
+});
+
+app.get('/api/admin/message-report', (req, res) => {
+  if (!isValidReportToken(req)) {
+    return res.status(process.env.ADMIN_REPORT_TOKEN ? 401 : 503).json({
+      error: process.env.ADMIN_REPORT_TOKEN
+        ? 'A valid report token is required.'
+        : 'Owner reporting is not configured.',
+    });
+  }
+
+  const report = readReport();
+  return res.json({
+    totalMessages: report.events.length,
+    uniqueVisitors: report.visitors.length,
+    daily: report.daily,
+    byChannel: report.byChannel,
+    generatedAt: new Date().toISOString(),
+  });
+});
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -544,4 +651,3 @@ function startServer(port) {
 }
 
 startServer(PORT);
-

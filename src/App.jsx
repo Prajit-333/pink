@@ -9,6 +9,7 @@ import { MessageWizard } from './components/MessageWizard';
 import { About } from './components/About';
 import { Awareness } from './components/Awareness';
 import { Footer } from './components/Footer';
+import { OwnerReport } from './components/OwnerReport';
 
 export function App() {
   const [darkMode, setDarkMode] = useState(() => {
@@ -37,6 +38,10 @@ export function App() {
       return () => clearTimeout(timer);
     }
   }, []);
+
+  if (window.location.hash === '#owner-report') {
+    return <OwnerReport />;
+  }
 
   return (
     <div className="min-h-screen relative selection:bg-pink-500 selection:text-white transition-colors duration-300">
