@@ -38,6 +38,23 @@ const RELATIONSHIPS = [
   'Other',
 ];
 
+const getVisitorId = () => {
+  const storageKey = 'pink_hope_visitor_id';
+  let visitorId = localStorage.getItem(storageKey);
+  if (!visitorId) {
+    visitorId = typeof crypto?.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    localStorage.setItem(storageKey, visitorId);
+  }
+  return visitorId;
+};
+
+const createEventId = () =>
+  typeof crypto?.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
 export const MessageWizard = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [activeCategory, setActiveCategory] = useState('awareness');
@@ -236,6 +253,24 @@ export const MessageWizard = () => {
 
     setIsSending(true);
     setSendError('');
+    const eventId = createEventId();
+    const visitorId = getVisitorId();
+    const isLocalhost =
+      typeof window !== 'undefined' &&
+      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    const backendUrl = import.meta.env.VITE_API_URL || (isLocalhost ? 'http://localhost:5001/api' : '/api');
+
+    const recordClientEvent = async () => {
+      try {
+        await fetch(`${backendUrl}/message-events`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ eventId, visitorId, channel }),
+        });
+      } catch (error) {
+        console.warn('[Pink Hope] Could not record message report event:', error);
+      }
+    };
 
     // Generate Card PNG Blob in memory for transmission
     const cardBlob = await generateCardImageBlob();
@@ -281,6 +316,7 @@ export const MessageWizard = () => {
           text: fullTextBody,
           files: [cardFile],
         });
+        await recordClientEvent();
         setIsSending(false);
         setSuccessModalOpen(true);
       } catch (err) {
@@ -326,9 +362,6 @@ export const MessageWizard = () => {
     // Try the backend only for SMS and email.
     let sentViaBackend = false;
     try {
-      const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-      const backendUrl = import.meta.env.VITE_API_URL || (isLocalhost ? 'http://localhost:5001/api' : '/api');
-
       const formData = new FormData();
       formData.append('channel', channel);
       formData.append('recipient', recipient);
@@ -340,6 +373,8 @@ export const MessageWizard = () => {
       formData.append('phone', `${countryCode}${phoneNumber}`);
       formData.append('email', emailAddress);
       formData.append('emailAddress', emailAddress);
+      formData.append('eventId', eventId);
+      formData.append('visitorId', visitorId);
       if (cardFile) {
         formData.append('cardImage', cardFile, `Pink-Hope-Card-${recipient}.png`);
       }
@@ -404,6 +439,10 @@ export const MessageWizard = () => {
         }
         // Note: For 'email', no external mailto handler is launched. Backend handles delivery seamlessly.
       }
+    }
+
+    if (!sentViaBackend && channel !== 'whatsapp' && channel !== 'email') {
+      await recordClientEvent();
     }
 
     setIsSending(false);

@@ -18,6 +18,7 @@ build/
 # Server Temporary Uploads
 server/temp_uploads/
 temp_uploads/
+server/message-report.json
 
 # Operating System & IDE Files
 .DS_Store
