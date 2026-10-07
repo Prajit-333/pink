@@ -1,6 +1,13 @@
 import React, { useState } from 'react';
 import { BarChart3, LockKeyhole, RefreshCw, Send, Users } from 'lucide-react';
 
+const getBackendUrl = () => {
+  const isLocalhost =
+    typeof window !== 'undefined' &&
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+  return import.meta.env.VITE_API_URL || (isLocalhost ? 'http://localhost:5001/api' : '/api');
+};
+
 export const OwnerReport = () => {
   const [token, setToken] = useState('');
   const [report, setReport] = useState(null);
@@ -13,7 +20,7 @@ export const OwnerReport = () => {
     setError('');
 
     try {
-      const response = await fetch('/api/admin/message-report', {
+      const response = await fetch(`${getBackendUrl()}/admin/message-report`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await response.json().catch(() => ({}));

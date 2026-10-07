@@ -122,7 +122,7 @@ The backend records only anonymous send events: total messages, unique browsers,
 
 1. Set a long random `ADMIN_REPORT_TOKEN` in `.env`.
 2. Keep the report store persistent in production. The default file is `server/message-report.json`; set `REPORT_DATA_FILE` to a mounted persistent path when the host has ephemeral disks.
-3. Open the website with `#owner-report` (for example, `https://your-domain.example/#owner-report`) and enter the token.
+3. Click **Owner monitor** at the bottom of the website, or open the website with `#owner-report` (for example, `https://your-domain.example/#owner-report`) and enter the token.
 
 The protected API is also available at `GET /api/admin/message-report` with `Authorization: Bearer <ADMIN_REPORT_TOKEN>`. This is an anonymous usage report, not a true authenticated-user count; “unique browsers” is an estimate of distinct visitors who sent a message from a browser.
 

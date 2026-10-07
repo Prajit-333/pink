@@ -13,6 +13,7 @@ import {
   ExternalLink,
   ShieldAlert,
   Check,
+  LockKeyhole,
 } from 'lucide-react';
 
 export const Footer = () => {
@@ -245,6 +246,11 @@ export const Footer = () => {
             </button>
             <span>•</span>
             <span className="italic">आत्मना सर्गो जितः</span>
+            <span>•</span>
+            <a href="/#owner-report" className="inline-flex items-center gap-1 hover:text-white transition-colors">
+              <LockKeyhole className="h-3 w-3" />
+              Owner monitor
+            </a>
           </div>
 
           <div className="flex items-center gap-2 text-center">
